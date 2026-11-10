@@ -1,0 +1,1671 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Стыковка</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1026">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+/* Палитра — одно место; canvas читает цвета через getComputedStyle (PROTO-BASE §9). */
+:root{
+  --bg:#05070f; --frame:#0b1026; --space:#0b1026; --space2:#1b2458; --ink:#f2f4fb; --muted:#9aa3c2;
+  --card:#151c3d; --btn:#26305e; --accent:#ffc93c;
+  --bp:#5fd3ff; --hull:#eef2f8; --hull-edge:#8a95ad; --solar:#ffc93c; --solar-edge:#a8740c;
+  --core:#7aa2ff; --core-edge:#3d5bb8; --strut:#8a95ad; --ok:#5fe08a; --bad:#ff5a6a; --flame:#ffb347;
+  --lamp:#fff1a8; --gate:#c58bff; --truss:#ff9f43; --mirror:#bfe9ff; --debris:#6f6681; --debris-edge:#4a4358; --star:#ffffff;
+  --frame-w:440px;
+}
+@media (prefers-color-scheme: light){
+  /* светлая тема: космос остаётся тёмным (это сцена), светлеют рамка и карточки */
+  :root{ --bg:#dfe4f2; --card:#f6f7fc; --btn:#dfe4f2; --ink:#161a2e; --muted:#5b6386; --space:#15204a; --space2:#2d3c86; }
+  header, footer{ color:#f2f4fb; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:16px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow:hidden;overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+#frame{position:relative;width:min(100vw,var(--frame-w));height:100dvh;height:100svh;margin:0 auto;background:var(--space);
+  display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);overflow:hidden}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px 4px;pointer-events:none;color:#f2f4fb;position:relative;z-index:2}
+header b{font-size:18px;white-space:nowrap}
+header button{pointer-events:auto}
+#hud-count{color:#9aa3c2;font-size:14px;white-space:nowrap}
+#bats{display:flex;gap:5px;align-items:center}
+/* батарейка — CSS-фигура (не глиф): корпус + контакт */
+.bat{position:relative;width:13px;height:22px;border:2px solid #9be7a8;border-radius:3px;display:inline-block}
+.bat::before{content:"";position:absolute;left:3px;top:-5px;width:3px;height:3px;background:#9be7a8;border-radius:1px 1px 0 0}
+.bat::after{content:"";position:absolute;left:2px;right:2px;bottom:2px;top:2px;background:#5fe08a;border-radius:1px}
+.bat.off{border-color:#4a5275}.bat.off::before{background:#4a5275}.bat.off::after{background:transparent}
+.bat.blink{animation:blink .5s ease-out 2}
+@keyframes blink{0%{border-color:#ff5a6a;transform:scale(1.25)}100%{transform:scale(1)}}
+#banner{position:absolute;left:0;right:0;top:0;text-align:center;pointer-events:none;padding:2px 16px 0;color:#c9d2f2;font-size:14px;z-index:1}
+#banner small{display:block;color:#ffd76a;font-size:14px;margin-top:2px}
+#game{flex:1;position:relative;touch-action:none}
+#game canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+footer{display:flex;gap:8px;justify-content:center;padding:6px 14px calc(10px + env(safe-area-inset-bottom));position:relative;z-index:2}
+button{font:inherit;color:#f2f4fb;background:#26305e;border:0;border-radius:12px;padding:10px 16px;cursor:pointer;touch-action:manipulation}
+button:disabled{opacity:.45}
+button.primary{background:var(--accent);color:#1a1c22;font-weight:700}
+#btn-undo{display:flex;align-items:center;gap:6px}
+#btn-undo i{font-style:normal;font-size:12px;color:#9be7a8}
+#btn-undo.pulse{animation:pulse 1s ease-in-out infinite;background:#3b4a9a}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+#btn-mute{width:40px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;background:transparent}
+#btn-mute svg{width:24px;height:24px}
+#overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(3,6,20,.55);padding:20px;z-index:5}
+#overlay.show{display:flex}
+#overlay.win{align-items:flex-end;padding-bottom:max(90px, 12vh);background:rgba(3,6,20,.12)}
+.card{background:var(--card);color:var(--ink);border-radius:20px;padding:22px;max-width:350px;width:100%;text-align:center;
+  animation:pop .2s ease-out} /* стартует с видимого состояния, не с opacity:0 (§9) */
+@keyframes pop{from{transform:scale(.95)}to{transform:scale(1)}}
+.card h2{margin:0 0 8px} .card p{color:var(--muted);margin:0 0 16px}
+.card .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:0 0 16px}
+.levels button{padding:10px 0;background:var(--btn);color:var(--ink)}
+.levels button.cur{outline:2px solid var(--accent)}
+.levels button:disabled{opacity:.35}
+.stars{display:flex;gap:6px;justify-content:center;margin:4px 0 12px}
+/* звезда — clip-path, не глиф (lesson-glyph-fallback-hitch) */
+.star{width:34px;height:34px;background:#4a5275;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.star.on{background:var(--accent)}
+.levels .star{width:10px;height:10px;display:inline-block}
+.help-list{text-align:left;color:var(--muted);margin:0 0 16px;padding-left:20px}
+.help-list li{margin:0 0 6px}
+#toast{position:absolute;left:50%;bottom:76px;transform:translateX(-50%);background:#26305e;color:#f2f4fb;padding:9px 14px;border-radius:12px;
+  pointer-events:none;opacity:.97;transition:opacity .25s;max-width:92%;text-align:center;font-size:15px;z-index:4}
+#toast.bad{background:#7a2433}
+#toast.hide{opacity:0}
+
+#prog{position:relative;flex:1;max-width:150px;height:18px;border-radius:9px;background:#1a2150;border:2px solid #3a4685;overflow:hidden}
+#prog-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,#3fb6e8,#7fe0ff);border-radius:7px;transition:width .35s cubic-bezier(.3,1.5,.5,1)}
+#prog #hud-count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#f2f4fb;text-shadow:0 1px 0 #0b1026}
+#prog.bump{animation:bump .3s ease-out}
+@keyframes bump{0%{transform:scale(1.12)}100%{transform:scale(1)}}
+footer button{display:flex;align-items:center;gap:6px;box-shadow:0 3px 0 #141a40}
+footer button:active{transform:translateY(2px);box-shadow:0 1px 0 #141a40}
+footer svg{width:18px;height:18px}
+.card{border:2px solid #2d3770;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.card .row button,.levels button{box-shadow:0 3px 0 rgba(0,0,0,.35)}
+button.primary{box-shadow:0 3px 0 #a8740c}
+.emblem{width:64px;height:64px;margin:0 auto 6px;border-radius:50%;background:radial-gradient(circle at 50% 50%,#e8f0ff 0 16%,#7aa2ff 17% 46%,#3d5bb8 47% 60%,transparent 61%),
+  linear-gradient(#eef2f8,#eef2f8) left 0 top 24px/18px 16px no-repeat,linear-gradient(#ffc93c,#ffc93c) right 0 top 24px/18px 16px no-repeat}
+.mini{display:block;line-height:0;margin-top:3px}
+.stars.big{gap:12px}.stars.big .star{width:46px;height:46px}
+.star.pop{animation:starpop .45s cubic-bezier(.3,1.8,.5,1) both}
+@keyframes starpop{0%{transform:scale(1.45) rotate(-25deg);background:#fff6c8}100%{transform:scale(1) rotate(0)}}
+.card.win{position:relative;overflow:hidden}
+.burst{position:absolute;left:50%;top:84px;width:420px;height:420px;margin:-210px 0 0 -210px;pointer-events:none;opacity:.35;
+  background:repeating-conic-gradient(from 0deg,rgba(255,201,60,.55) 0 10deg,transparent 10deg 30deg);animation:spin 9s linear infinite;
+  -webkit-mask:radial-gradient(circle,#000 0 30%,transparent 62%);mask:radial-gradient(circle,#000 0 30%,transparent 62%)}
+.card.win > *:not(.burst){position:relative}
+@keyframes spin{to{transform:rotate(360deg)}}
+#banner .ttl{font-weight:700;letter-spacing:.02em}
+@media (prefers-reduced-motion: reduce){ .star.pop,.burst,#prog.bump{animation:none}  .card{animation:none} #toast{transition:none} #btn-undo.pulse,.bat.blink{animation:none} }
+</style>
+</head>
+<body>
+<div id="frame">
+  <header>
+    <b id="hud-level">Уровень 1</b>
+    <span id="prog"><i id="prog-fill"></i><span id="hud-count">0 / 0</span></span>
+    <span id="bats"><i class="bat"></i><i class="bat"></i><i class="bat"></i></span>
+    <button id="btn-mute" aria-label="звук"></button>
+  </header>
+  <div id="game"><canvas id="cv"></canvas><div id="banner"></div></div>
+  <footer>
+    <button id="btn-undo"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12h9a5 5 0 010 10h-2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>Отмена <i>−1</i></button>
+    <button id="btn-reset"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Заново</button>
+    <button id="btn-menu"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>Меню</button>
+  </footer>
+  <div id="overlay"><div class="card" id="card"></div></div>
+  <div id="toast" class="hide"></div>
+</div>
+<script>
+'use strict';
+/* ЯДРО */
+// ---------------------------------------------------------------------------
+// «Стыковка». Поле w×h, в центре ядро станции, пунктиром — чертёж (какие клетки
+// и каким типом модуля заполнить). По краям — очереди модулей, у каждой очереди
+// своя линия (ряд или столбец) и сторона входа. Тап по очереди: передний модуль
+// летит прямо по линии и встаёт в клетку перед первым занятым (станция или обломок).
+//   dock     — встал в пунктир своего типа: защёлкнулся, клетка заполнена;
+//   crooked  — встал вне чертежа или не в свой тип: «станция кривая», модуль
+//              отстёгивается и возвращается в очередь, −1 батарейка;
+//   off      — ничего не задел, улетел в космос: возвращается, −1 батарейка;
+//   blocked  — линия занята у самого края, модулю некуда встать: то же, что промах.
+// Отмена последней стыковки — тоже −1 батарейка. Батарейки кончились — проигрыш.
+// Тупик (чертёж уже не достроить) ядро видит сразу: dead = true.
+// ---------------------------------------------------------------------------
+const CFG = {
+  // правила
+  BATTERIES: 3,          // батареек на уровень (звёзды за победу = сколько осталось)
+  MISS_COST: 1,          // цена промаха (мимо станции, вне чертежа, не тот тип)
+  UNDO_COST: 1,          // цена отмены последней стыковки
+  // солвер и боты
+  SOLVE_CAP: 120000,     // предел узлов перебора; выше — «не знаем», тупик не объявляем
+  NOVICE_RUNS: 300,      // партий бота-новичка на уровень в аудите
+  // генератор уровней (genLayout)
+  GEN_ADJ_W: 1.5,        // прибавка веса за каждого лишнего соседа-станцию: станция компактнее
+  GEN_QUEUE_W: 1.6,      // множитель веса для уже занятой очереди: чаще «второй встаёт дальше»
+  GEN_DEBRIS_W: 2.5,     // множитель веса, если модуль встаёт об обломок: обломки участвуют в решении
+  GEN_MIRROR_W: 3,       // множитель веса для полёта через отражатель
+  GEN_GATE_W: 3,         // множитель веса для полёта сквозь открытое поле или упора в закрытое
+  DEPTH_LR: 2,           // глубина очереди слева и справа (места по ширине мало)
+  DEPTH_TB: 3,           // глубина очереди сверху и снизу
+  DEBRIS_MIN_R: 2,       // обломок не ближе этого (по Чебышёву) к ядру
+  // анимация и ощущение (оболочка)
+  FLY_CPS: 15,           // скорость полёта модуля, клеток в секунду
+  FLY_MIN_MS: 200,       // минимальная длительность полёта
+  RETURN_MS: 380,        // модуль после промаха возвращается в очередь
+  SLIDE_MS: 200,         // очередь подтягивается к краю
+  DOCK_FX_MS: 520,       // вспышка и искры стыковки
+  SHAKE_MS: 150,         // тряска станции от стыковки
+  SHAKE_PX: 2.5,         // её амплитуда, виртуальных пикселей
+  WIN_DELAY_MS: 1500,    // огни станции до карточки победы
+  LOSE_DELAY_MS: 800,    // пауза до карточки проигрыша
+  TOAST_MS: 2200,        // сколько висит тост
+  HINT_IDLE_MS: 5000,    // рука-подсказка на обучающих уровнях после бездействия
+  // раскладка экрана (в клетках поля)
+  Q_OFF0: 0.64,          // центр переднего модуля очереди от края поля
+  Q_STEP: 0.68,          // шаг между модулями очереди
+  Q_SCALE0: 0.84,        // размер переднего модуля (доля клетки)
+  Q_SCALEK: 0.6,         // размер модулей позади
+  Q_EDGE0: 0.22,         // зазор между кромкой поля и передним модулем очереди
+  Q_GAP: 0.04,           // зазор между модулями очереди
+  TRUSS_VL: 2.25,        // ферма во столько раз длиннее модуля (две клетки по 0,8 и шов)
+  // полировка отклика (оболочка)
+  INTRO_MS: 700,         // появление уровня: чертёж волной от ядра, очереди подъезжают из-за края
+  PRESS_SCALE: 0.9,      // модуль под пальцем поджимается
+  TRAIL_GHOSTS: 4,       // шлейф летящего модуля (полупрозрачные копии позади)
+  SQUASH_MS: 220,        // сплющивание модуля от удара при стыковке
+  LATCH_MS: 300,         // защёлки на шве стыковки
+  WOBBLE_MS: 300,        // покачивание кривого модуля перед возвратом
+  WORD_MS: 950,          // всплывающее слово над клеткой
+  STREAK_WORDS: { 3: 'Чётко!', 5: 'Ас стыковки!', 8: 'Космос!' },   // слова за серию стыковок без промаха
+  PARTS_MAX: 280,        // предел частиц на экране
+  CONFETTI_N: 70,        // конфетти на победе
+  WIN_ZOOM: 1.06,        // станция чуть приближается на победе
+  TOAST_REPEAT: 2,       // объяснение промаха тостом — первые N раз за сессию, дальше только слово на месте
+  AMBIENT_VOL: 0.035,    // громкость фонового гула космоса
+  CROP_PAD: 1,           // запас пустых клеток вокруг станции после обрезки поля
+  CELL_MAX: 64,          // клетка не крупнее, виртуальных px (маленькие поля не раздуваются)
+};
+
+// Значения occ; > 0 — пристыкованный модуль этого типа.
+// Отражатель '/' поворачивает полёт (dx,dy)→(−dy,−dx), '\\' — (dx,dy)→(dy,dx); сам не занимается, модуль проходит сквозь.
+// Силовое поле — преграда, пока стыковок меньше порога (gate[i]), потом пропускает; клетка под ним может быть в чертеже.
+const EMPTY = 0, DEBRIS = -1, CORE = -2, MIRROR_A = -3, MIRROR_B = -4, GATE = -5;
+const HULL = 1, SOLAR = 2, TRUSS = 3;      // жилой (белый, иллюминатор), солнечная панель, ферма (длинная, 2 клетки вдоль полёта)
+const MOD_LEN = { 1: 1, 2: 1, 3: 2 };      // длина модуля в клетках по типу
+const SIDES = ['T', 'R', 'B', 'L'];
+const DIR = { L: [1, 0], R: [-1, 0], T: [0, 1], B: [0, -1] };   // направление полёта от стороны входа
+const KIND_CH = { o: HULL, s: SOLAR, t: TRUSS };
+const isMirror = (v) => v === MIRROR_A || v === MIRROR_B;
+
+// Детерминированный генератор случайных чисел (PROTO-BASE §5). Math.random() в ядре не используется.
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Контент. Обучающие уровни — картой: '.' пусто, 'C' ядро, '#' обломок, 'o' пунктир жилого модуля,
+// 's' пунктир солнечной панели; очереди — 'сторона+индекс:типы, передний первым' (T/B — столбец, L/R — ряд).
+// Остальные — генератор genLayout(gen, seed); сид подобран `node sim.mjs pick` под полосу сложности band
+// (доля партий новичка без единого тупика). Сид = номер уровня × 1000 + подбор.
+const LEVELS = [
+  { n: 1, title: 'Первая стыковка', hint: 'Тапни модуль — он полетит к станции',
+    map: ['.....', '.....', '.oCo.', '.....', '.....'], q: ['L2:o', 'R2:o'] },
+  { n: 2, title: 'Очередь', hint: 'Второй из очереди встанет на шаг дальше',
+    map: ['.....', '..o..', 'ooCo.', '.....', '.....'], q: ['L2:oo', 'R2:o', 'T2:o'] },
+  { n: 3, title: 'Не сейчас', hint: 'Мимо станции — улетит. Сначала подставь опору',
+    map: ['.....', '.o...', '.oCo.', '...o.', '.....'], q: ['L2:o', 'T1:o', 'R2:o', 'B3:o'] },
+  { n: 4, title: 'Чужое место', hint: 'Встал в пунктир — ещё не значит, что на своё место',
+    map: ['.....', '.o...', 'ooC..', '.oo..', '.....'], q: ['B2:o', 'L3:o', 'L2:oo', 'T1:o'] },
+  { n: 5, title: 'Крестовина', gen: { g: 7, n: 8 }, band: [0.55, 0.85], seed: 5005 },
+  { n: 6, title: 'Длинная ферма', gen: { g: 7, n: 10 }, band: [0.45, 0.75], seed: 6007 },
+  { n: 7, title: 'Солнечные панели', hint: 'Жёлтая панель встаёт только в жёлтый пунктир',
+    gen: { g: 7, n: 8, solar: 0.4 }, band: [0.5, 0.85], seed: 7005 },
+  { n: 8, title: 'Электростанция', gen: { g: 7, n: 11, solar: 0.45 }, band: [0.35, 0.7], seed: 8004 },
+  { n: 9, title: 'Пояс обломков', hint: 'Об обломок модуль тоже стукнется',
+    gen: { g: 7, n: 9, debris: 2 }, band: [0.4, 0.8], seed: 9083 },
+  { n: 10, title: 'Орбитальный город', gen: { g: 7, n: 13, solar: 0.35, debris: 2 }, band: [0.3, 0.65], seed: 10032 },
+  // Глава 2 «Красная планета»: сложность не числом модулей, а новыми элементами и их сочетанием.
+  // Карта: '/' и '\\' — отражатели, 'g' — силовое поле, 'G' — поле над клеткой чертежа (жилой), пороги — gates[] по порядку чтения;
+  // цифра — пунктир фермы (одна цифра = одна ферма на 2 клетки). need — что обязано участвовать в решении (для pick).
+  { n: 11, ch: 2, title: 'Отражатель', hint: 'Отражатель поворачивает модуль на 90°',
+    map: ['.......', '.......', '.\\oCo..', '...o...', '.......'], q: ['T1:o', 'R2:o', 'B3:o'] },
+  { n: 12, ch: 2, title: 'Зеркальный коридор', gen: { g: 7, n: 9, mirrors: 2 }, need: { mirrorHits: 3 }, band: [0.5, 0.85], seed: 12053 },
+  { n: 13, ch: 2, title: 'Ферма', hint: 'Ферма длиной в две клетки — и пунктир у неё двойной',
+    map: ['.....', '..1..', '..1..', '.oCo.', '..2..', '..2..', '.....'], q: ['T2:t', 'L3:o', 'B2:t', 'R3:o'] },
+  { n: 14, ch: 2, title: 'Мачты', gen: { g: 7, n: 8, truss: 0.4 }, need: { trusses: 3 }, band: [0.45, 0.8], seed: 14003 },
+  { n: 15, ch: 2, title: 'Силовое поле', hint: 'Поле пропустит после двух стыковок — число на нём',
+    map: ['.......', '....o..', '..GoCo.', '.......', '.......'], q: ['L2:oo', 'T4:o', 'R2:o'], gates: [2] },
+  { n: 16, ch: 2, title: 'Шлюзы', gen: { g: 7, n: 9, gates: 2 }, need: { gateUses: 2 }, band: [0.45, 0.8], seed: 16003 },
+  { n: 17, ch: 2, title: 'Ферма за углом', gen: { g: 7, n: 9, mirrors: 2, truss: 0.3 }, need: { mirrorHits: 2, trusses: 2 }, band: [0.4, 0.75], seed: 17043 },
+  { n: 18, ch: 2, title: 'Поле и зеркало', gen: { g: 7, n: 10, mirrors: 2, gates: 1 }, need: { mirrorHits: 2, gateUses: 1 }, band: [0.35, 0.7], seed: 18006 },
+  { n: 19, ch: 2, title: 'Солнечная верфь', gen: { g: 7, n: 10, truss: 0.3, solar: 0.35, gates: 1 }, need: { trusses: 2, gateUses: 1 }, band: [0.35, 0.7], seed: 19020 },
+  { n: 20, ch: 2, title: 'Звёздный док', gen: { g: 7, n: 11, mirrors: 2, truss: 0.25, gates: 1, solar: 0.3, debris: 1 },
+    need: { mirrorHits: 2, trusses: 2, gateUses: 1 }, band: [0.3, 0.65], seed: 20093 },
+];
+
+function idxOf(w, x, y){ return y * w + x; }
+// Поле для расчёта полёта: занятость, размеры, пороги полей и сколько стыковок уже было (поля открываются по ним).
+function fieldOf(s){ return { occ: s.occ, w: s.w, h: s.h, gate: s.gate, docks: s.hist.length }; }
+function blocks(f, i){ const v = f.occ[i]; return v !== EMPTY && !isMirror(v) && !(v === GATE && f.docks >= f.gate[i]); }
+// Полёт модуля длиной len из очереди side+idx: идёт, пока следующая клетка свободна; отражатель поворачивает
+// (ферму len 2 — нет: для неё отражатель как обломок). stop — передняя клетка, где встал (−1 — некуда встать или
+// застрял на отражателе), cells — клетки модуля (для фермы передняя и задняя; задняя за краем — cells короче len),
+// hit — во что упёрся (−1 — пролетел насквозь), path — пройденные клетки, turns — отражатели по пути, dir — итоговое направление.
+function trace(f, side, idx, len){
+  len = len || 1;
+  let d = DIR[side].slice(), x = side === 'L' ? -1 : side === 'R' ? f.w : idx, y = side === 'T' ? -1 : side === 'B' ? f.h : idx;
+  const path = [], turns = [], seen = new Set();
+  for (;;){
+    const nx = x + d[0], ny = y + d[1];
+    if (nx < 0 || ny < 0 || nx >= f.w || ny >= f.h) return { stop: -1, hit: -1, path, turns, dir: d, cells: [] };
+    const ni = idxOf(f.w, nx, ny), v = f.occ[ni], m = isMirror(v);
+    if ((m && len > 1) || (!m && blocks(f, ni))){
+      const last = path.length ? path[path.length - 1] : -1;
+      if (last < 0 || isMirror(f.occ[last])) return { stop: -1, hit: ni, path, turns, dir: d, cells: [] };
+      const cells = [last]; if (len > 1 && path.length > 1) cells.push(path[path.length - 2]);
+      return { stop: last, hit: ni, path, turns, dir: d, cells };
+    }
+    path.push(ni); x = nx; y = ny;
+    if (m){
+      const key = ni * 8 + (d[0] + 1) * 3 + (d[1] + 1); if (seen.has(key)) return { stop: -1, hit: -1, path, turns, dir: d, cells: [], loop: true };
+      seen.add(key); d = v === MIRROR_A ? [-d[1], -d[0]] : [d[1], d[0]]; turns.push(ni);
+    }
+  }
+}
+// Встал ли модуль своего типа ровно в свой пунктир (ферма — обе клетки одной фермы).
+function fits(bp, grp, kind, cells){
+  if (cells.length !== MOD_LEN[kind] || !cells.every(c => bp[c] === kind)) return false;
+  return cells.length === 1 || (grp[cells[0]] > 0 && grp[cells[0]] === grp[cells[1]]);
+}
+function stationNb(occ, w, h, i){     // сколько соседей клетки — станция (ядро или модуль)
+  const x = i % w, y = (i - x) / w; let n = 0;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
+    const X = x + dx, Y = y + dy;
+    if (X >= 0 && Y >= 0 && X < w && Y < h){ const v = occ[idxOf(w, X, Y)]; if (v === CORE || v > 0) n++; }
+  }
+  return n;
+}
+
+function parseMap(L){
+  const h = L.map.length, w = L.map[0].length, N = w * h, bp = new Array(N).fill(0), grp = new Array(N).fill(0), gate = new Array(N).fill(0);
+  const base = new Array(N).fill(EMPTY), core = [], debris = [], mirrors = [], gates = [];
+  let gk = 0;
+  L.map.forEach((row, y) => [...row].forEach((ch, x) => {
+    const i = idxOf(w, x, y);
+    if (ch === 'C'){ base[i] = CORE; core.push(i); }
+    else if (ch === '#'){ base[i] = DEBRIS; debris.push(i); }
+    else if (ch === '/' || ch === '\\'){ base[i] = ch === '/' ? MIRROR_A : MIRROR_B; mirrors.push(i); }
+    else if (ch === 'g' || ch === 'G'){ base[i] = GATE; gate[i] = L.gates[gk++]; gates.push(i); if (ch === 'G') bp[i] = HULL; }
+    else if (ch >= '1' && ch <= '9'){ bp[i] = TRUSS; grp[i] = +ch; }
+    else if (KIND_CH[ch]) bp[i] = KIND_CH[ch];
+  }));
+  const lanes = L.q.map(str => { const [head, kinds] = str.split(':'); return { side: head[0], idx: +head.slice(1), q: [...kinds].map(ch => KIND_CH[ch]) }; });
+  return { w, h, bp, grp, gate, base, core, debris, mirrors, gates, lanes };
+}
+// Обрезка пустых краёв: поле = рамка вокруг ядра, чертежа и обломков + запас CFG.CROP_PAD клеток.
+// Правила не меняются: модуль всё равно входит с края и летит до первого занятого; клетки крупнее на экране.
+function cropLayout(lay){
+  const { w, h } = lay; let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let i = 0; i < w * h; i++) if (lay.bp[i] > 0 || lay.base[i] !== EMPTY){ const x = i % w, y = (i - x) / w; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const P = CFG.CROP_PAD; x0 = Math.max(0, x0 - P); y0 = Math.max(0, y0 - P); x1 = Math.min(w - 1, x1 + P); y1 = Math.min(h - 1, y1 + P);
+  const W2 = x1 - x0 + 1, H2 = y1 - y0 + 1, map = (i) => { const x = i % w, y = (i - x) / w; return idxOf(W2, x - x0, y - y0); };
+  const pick = (arr) => { const out = new Array(W2 * H2); for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) out[idxOf(W2, x, y)] = arr[idxOf(w, x + x0, y + y0)]; return out; };
+  const lanes = lay.lanes.map(l => ({ side: l.side, idx: l.idx - (l.side === 'L' || l.side === 'R' ? y0 : x0), q: l.q.slice() }));
+  for (const l of lanes) if (l.idx < 0 || l.idx >= (l.side === 'L' || l.side === 'R' ? H2 : W2)) throw new Error('очередь ' + l.side + l.idx + ' за обрезкой поля');
+  return Object.assign({}, lay, { w: W2, h: H2, bp: pick(lay.bp), grp: pick(lay.grp), gate: pick(lay.gate), base: pick(lay.base),
+    core: lay.core.map(map), debris: lay.debris.map(map), mirrors: lay.mirrors.map(map), gates: lay.gates.map(map), lanes });
+}
+
+// Генератор: станция растёт от ядра честными стыковками (каждый шаг — модуль из какой-то очереди, который
+// при текущей станции встаёт рядом с ней). Порядок генерации — готовое решение, значит уровень решаем.
+// p: g — сторона квадрата, n — модулей, solar/truss — доли типов, debris/mirrors/gates — сколько препятствий.
+function genLayout(p, seed){
+  const rnd = mulberry32(seed), g = p.g, N = g * g, h = g >> 1;   // генерация на квадрате g×g, потом cropLayout
+  const base = new Array(N).fill(EMPTY), bp = new Array(N).fill(0), grp = new Array(N).fill(0), gate = new Array(N).fill(0);
+  const core = [idxOf(g, h, h)], debris = [], mirrors = [], gates = [];
+  base[core[0]] = CORE;
+  const place = (count, minR, put) => {
+    for (let k = 0, guard = 0; k < (count || 0) && guard < 500; guard++){
+      const i = Math.floor(rnd() * N), x = i % g, y = (i - x) / g;
+      if (base[i] !== EMPTY || Math.max(Math.abs(x - h), Math.abs(y - h)) < minR) continue;
+      put(i); k++;
+    }
+  };
+  place(p.debris, CFG.DEBRIS_MIN_R, (i) => { base[i] = DEBRIS; debris.push(i); });
+  place(p.mirrors, 1, (i) => { base[i] = rnd() < 0.5 ? MIRROR_A : MIRROR_B; mirrors.push(i); });
+  place(p.gates, 1, (i) => { base[i] = GATE; gate[i] = 2 + Math.floor(rnd() * Math.max(1, Math.min(4, p.n - 4))); gates.push(i); });
+  const occ = base.slice(), laneOf = {}, order = [];
+  let debrisHits = 0, mirrorHits = 0, gateUses = 0, trusses = 0, gid = 0;
+  for (let step = 0; step < p.n; step++){
+    const f = { occ, w: g, h: g, gate, docks: step };
+    // ферма решается до выбора места (у неё другая длина), жилой/панель — после, как в главе 1 (сиды 1–10 не сдвигаются)
+    let kind = p.truss && rnd() < p.truss ? TRUSS : HULL;
+    let cands = [], wsum = 0;
+    for (let attempt = 0; attempt < 2 && !cands.length; attempt++){
+      if (attempt) kind = HULL;
+      const len = MOD_LEN[kind];
+      for (const side of SIDES) for (let idx = 0; idx < g; idx++){
+        const key = side + idx, ln = laneOf[key], depth = side === 'L' || side === 'R' ? CFG.DEPTH_LR : CFG.DEPTH_TB;
+        const used = ln ? ln.q.reduce((a, k) => a + MOD_LEN[k], 0) : 0;
+        if (used + len > depth) continue;
+        const t = trace(f, side, idx, len);
+        if (t.stop < 0 || t.cells.length !== len) continue;
+        const nb = Math.max(...t.cells.map(c => stationNb(occ, g, g, c))); if (!nb) continue;   // касается станции, не только преграды
+        const viaGate = t.path.some(c => base[c] === GATE) || (occ[t.hit] === GATE);
+        let w = 1 + CFG.GEN_ADJ_W * (nb - 1);
+        if (ln) w *= CFG.GEN_QUEUE_W;
+        if (occ[t.hit] === DEBRIS) w *= CFG.GEN_DEBRIS_W;
+        if (t.turns.length) w *= CFG.GEN_MIRROR_W;
+        if (viaGate) w *= CFG.GEN_GATE_W;
+        cands.push({ side, idx, key, t, w, viaGate }); wsum += w;
+      }
+    }
+    if (!cands.length) return null;
+    let r = rnd() * wsum, pick = cands[cands.length - 1];
+    for (const c of cands){ r -= c.w; if (r <= 0){ pick = c; break; } }
+    if (kind !== TRUSS && p.solar && rnd() < p.solar) kind = SOLAR;
+    if (kind === TRUSS){ gid++; trusses++; }
+    for (const c of pick.t.cells){ occ[c] = kind; bp[c] = kind; if (kind === TRUSS) grp[c] = gid; }
+    if (occ[pick.t.hit] === DEBRIS) debrisHits++;
+    if (pick.t.turns.length) mirrorHits++;
+    if (pick.viaGate) gateUses++;
+    if (!laneOf[pick.key]) laneOf[pick.key] = { side: pick.side, idx: pick.idx, q: [] };
+    laneOf[pick.key].q.push(kind); order.push(pick.key);
+  }
+  const lanes = Object.values(laneOf).sort((a, b) => SIDES.indexOf(a.side) - SIDES.indexOf(b.side) || a.idx - b.idx);
+  return { w: g, h: g, bp, grp, gate, base, core, debris, mirrors, gates, lanes, order, debrisHits, mirrorHits, gateUses, trusses };
+}
+
+const layCache = new Map();
+function layoutOf(li){
+  if (!layCache.has(li)){ const L = LEVELS[li]; layCache.set(li, cropLayout(L.map ? parseMap(L) : genLayout(L.gen, L.seed))); }
+  return layCache.get(li);
+}
+function stateFromLayout(lay, li){
+  const total = lay.bp.filter(k => k > 0).length;
+  return { li, w: lay.w, h: lay.h, bp: lay.bp, grp: lay.grp, gate: lay.gate, base: lay.base, lanes: lay.lanes, core: lay.core,
+    debris: lay.debris, mirrors: lay.mirrors, gates: lay.gates,
+    occ: lay.base.slice(), ptr: lay.lanes.map(() => 0), bat: CFG.BATTERIES, placed: 0, total,
+    moves: 0, misses: 0, undos: 0, hist: [], last: null, dead: false };
+}
+function createState(li){ return stateFromLayout(layoutOf(li), li); }
+function cloneState(s){ return { ...s, occ: s.occ.slice(), ptr: s.ptr.slice(), hist: s.hist.slice() }; }
+
+// Куда встанет передний модуль очереди li — честный расчёт того же ядра (им же рисуется превью).
+function landing(s, li){
+  const ln = s.lanes[li]; if (!ln || s.ptr[li] >= ln.q.length) return null;
+  const kind = ln.q[s.ptr[li]], t = trace(fieldOf(s), ln.side, ln.idx, MOD_LEN[kind]);
+  const res = t.hit < 0 ? 'off' : t.stop < 0 ? 'blocked' : fits(s.bp, s.grp, kind, t.cells) ? 'dock' : 'crooked';
+  return { li, kind, res, cell: t.stop, cells: t.cells, hit: t.hit, path: t.path, turns: t.turns, dir: t.dir };
+}
+function legalMoves(s){ const out = []; if (isWin(s)) return out; s.ptr.forEach((p, li) => { if (p < s.lanes[li].q.length) out.push(li); }); return out; }
+function dockMoves(s){ return legalMoves(s).filter(li => landing(s, li).res === 'dock'); }
+
+// Перебор порядка стыковок (только удачные стыковки; промахи состояние не меняют). Мемо по занятости + очередям.
+function solveInfo(s){
+  const occ = s.occ.slice(), ptr = s.ptr.slice(), lanes = s.lanes, bp = s.bp, seen = new Set(), path = [];
+  const f = { occ, w: s.w, h: s.h, gate: s.gate, docks: s.hist.length };
+  let left = s.total - s.placed, nodes = 0, capped = false;
+  function rec(){
+    if (left === 0) return true;
+    const key = ptr.join(',') + '|' + occ.join('');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    if (++nodes > CFG.SOLVE_CAP){ capped = true; return false; }
+    for (let li = 0; li < lanes.length; li++){
+      const ln = lanes[li]; if (ptr[li] >= ln.q.length) continue;
+      const kind = ln.q[ptr[li]], t = trace(f, ln.side, ln.idx, MOD_LEN[kind]);
+      if (t.hit < 0 || t.stop < 0 || !fits(bp, s.grp, kind, t.cells)) continue;
+      for (const c of t.cells) occ[c] = kind; ptr[li]++; left -= t.cells.length; f.docks++; path.push(li);
+      if (rec()) return true;
+      for (const c of t.cells) occ[c] = s.base[c]; ptr[li]--; left += t.cells.length; f.docks--; path.pop();
+      if (capped) return false;
+    }
+    return false;
+  }
+  const ok = rec();
+  return { path: ok ? path.slice() : null, exact: ok || !capped, nodes };
+}
+function solve(s){ return solveInfo(s).path; }
+function isDead(s){ if (isWin(s)) return false; const r = solveInfo(s); return !r.path && r.exact; }
+
+function applyMove(s, li){
+  const L = landing(s, li); if (!L || isWin(s) || isLose(s)) return s;
+  const n = cloneState(s); n.moves++; n.last = L;
+  if (L.res === 'dock'){ for (const c of L.cells) n.occ[c] = L.kind; n.ptr[li]++; n.placed += L.cells.length; n.hist.push({ li, cell: L.cell, cells: L.cells }); n.dead = isDead(n); }
+  else { n.bat -= CFG.MISS_COST; n.misses++; }
+  return n;
+}
+function canUndo(s){ return s.hist.length > 0 && !isWin(s) && s.bat > CFG.UNDO_COST; }
+function undoMove(s){
+  if (!canUndo(s)) return s;
+  const n = cloneState(s), h = n.hist.pop();
+  for (const c of h.cells) n.occ[c] = s.base[c]; n.ptr[h.li]--; n.placed -= h.cells.length; n.bat -= CFG.UNDO_COST; n.undos++;
+  n.last = { li: h.li, res: 'undo', cell: h.cell, cells: h.cells, kind: s.occ[h.cell] }; n.dead = isDead(n);
+  return n;
+}
+function isWin(s){ return s.placed === s.total; }
+// Проигрыш: батарейки кончились, или тупик, а на отмену батареек уже не хватает.
+function isLose(s){ return !isWin(s) && (s.bat <= 0 || (s.dead && s.bat <= CFG.UNDO_COST)); }
+function starsFor(s){ return Math.max(1, Math.min(3, s.bat)); }
+
+// Боты (PROTO-BASE §6). Случайный — тапает любую очередь. Новичок — тапает наугад среди тех, что встанут
+// в пунктир (траекторию он видит), в тупике отменяет и больше этот ход в этом месте не делает.
+// Жадный — выбирает стыковку, после которой остаётся больше удачных вариантов.
+function randomRun(li, seed){
+  const rnd = mulberry32(seed); let s = createState(li);
+  while (!isWin(s) && !isLose(s)){ const m = legalMoves(s); s = applyMove(s, m[Math.floor(rnd() * m.length)]); }
+  return { win: isWin(s), moves: s.moves, bat: s.bat };
+}
+function noviceOn(s, seed){
+  const rnd = mulberry32(seed), banned = new Set(); let dead = 0;
+  const key = (st) => st.ptr.join(',') + '|' + st.occ.join('');
+  while (!isWin(s) && !isLose(s)){
+    const k = key(s), m = dockMoves(s).filter(li => !banned.has(k + '>' + li));
+    if (!m.length){ if (canUndo(s)) { s = undoMove(s); continue; } break; }
+    const li = m[Math.floor(rnd() * m.length)], n = applyMove(s, li);
+    if (n.dead){ dead++; banned.add(k + '>' + li); s = canUndo(n) ? undoMove(n) : n; }
+    else s = n;
+  }
+  return { win: isWin(s), clean: isWin(s) && dead === 0, deadEnds: dead, undos: s.undos, bat: s.bat, moves: s.moves };
+}
+function noviceRun(li, seed){ return noviceOn(createState(li), seed); }
+function greedyRun(li){
+  let s = createState(li);
+  while (!isWin(s) && !isLose(s)){
+    const m = dockMoves(s); if (!m.length) break;
+    let best = m[0], bestN = -1;
+    for (const li2 of m){ const n = applyMove(s, li2), v = n.dead ? -1 : dockMoves(n).length; if (v > bestN){ bestN = v; best = li2; } }
+    s = applyMove(s, best);
+  }
+  return { win: isWin(s), moves: s.moves, bat: s.bat };
+}
+// Метрики уровня для подбора сида и аудита: доля чистых побед новичка, побед с отменами, побед случайного.
+function levelMetrics(s0, runs, seed){
+  let clean = 0, win = 0, rnd = 0, opts = 0, dec = 0;
+  for (let k = 0; k < runs; k++){
+    const r = noviceOn(cloneState(s0), seed * 7919 + k); clean += r.clean ? 1 : 0; win += r.win ? 1 : 0;
+  }
+  for (let k = 0; k < runs; k++){
+    const r2 = mulberry32(seed * 31 + k); let s = cloneState(s0);
+    while (!isWin(s) && !isLose(s)){ const m = legalMoves(s); s = applyMove(s, m[Math.floor(r2() * m.length)]); }
+    rnd += isWin(s) ? 1 : 0;
+  }
+  // очевидность: сколько очередей в среднем «зелёные» по ходу решения
+  let s = cloneState(s0); const sol = solve(s) || [];
+  for (const li of sol){ opts += dockMoves(s).length / legalMoves(s).length; dec++; s = applyMove(s, li); }
+  return { clean: clean / runs, win: win / runs, random: rnd / runs, green: dec ? opts / dec : 0 };
+}
+/* КОНЕЦ ЯДРА */
+// ---------------------------------------------------------------------------
+// Оболочка: экраны, ввод, рендер, звук, сейв, дебаг-хук. Время абсолютное (§4):
+// все анимации — дедлайны по clock(), clock() = реальное время × скорость + прогон drive().
+// ---------------------------------------------------------------------------
+const NAME = 'stykovka';
+const VERSION = '0.3';
+const T0 = performance.now();
+function log(kind, name, info){            // журнал [game] — одна строка на событие (§11)
+  console.log('[game] ' + JSON.stringify({ t: +((performance.now() - T0) / 1000).toFixed(3), kind, name, info: info === undefined ? '' : String(info) }));
+}
+
+const SAVE_KEY = NAME + '.v1';
+function loadSave(){ try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { return {}; } }
+function save(){ try { localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) {} }
+const RM = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+
+const G = {
+  s: null,                       // состояние ядра
+  screen: 'menu',                // menu | game | win | lose | help
+  save: Object.assign({ level: 0, open: 0, muted: false, best: {} }, loadSave()),
+  flights: [],                   // летящие модули: { li, kind, res, cell, hit, ang, t0, t1, from, to, back0, back1 }
+  fx: [],                        // кольца, вспышки, слова: { type, x, y, t0, t1, ... }
+  parts: [],                     // частицы (выхлоп, искры, конфетти) — движение аналитическое от t0, без накопления dt
+  cellFx: {},                    // клетка → { t0, ang } — сплющивание и защёлки после стыковки
+  pending: new Set(),            // клетки, куда модуль уже «встал» в ядре, но ещё летит на экране
+  laneBusy: {},                  // li → до какого времени очередь занята анимацией
+  laneSlide: {},                 // li → момент, когда очередь подтянулась (анимация сдвига)
+  press: null,                   // { id, li, since } — палец на очереди: показываем траекторию
+  ending: null,                  // { kind: 'win'|'lose', at, why } — финал уровня по дедлайнам
+  winAt: 0, loseAt: 0,           // когда зажглись огни станции / когда погасли
+  introAt: 0,                    // начало появления уровня
+  shakeUntil: 0, shakeAng: 0, shakeAmp: 1,
+  streak: 0,                     // стыковок подряд без промаха
+  told: {},                      // сколько раз объяснили промах тостом (по виду)
+  sched: [],                     // отложенные события по дедлайну: { at, fn } (звон отражателя в момент прохода)
+  mirrorHit: {},                 // отражатель → когда через него прошёл модуль (вспышка)
+  lastInput: 0,                  // для руки-подсказки
+  hintLane: -1, hintKey: '',
+  timeScale: 1, rt0: performance.now(), vt0: 0, skew: 0,
+  paused: false, errors: 0, frame: 0,
+};
+function clock(){ return G.vt0 + (performance.now() - G.rt0) * G.timeScale + G.skew; }
+function setSpeed(x){ const now = clock(); G.vt0 = now - G.skew; G.rt0 = performance.now(); G.timeScale = x || 1; }
+
+// --- звук: WebAudio-синтез без файлов, ленивый старт по первому жесту (§8) ---
+const PENTA = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093];   // пентатоника перезвона стыковок
+const Sfx = {
+  ac: null, master: null, noise: null, amb: null,
+  init(){
+    if (this.ac) { if (this.ac.state === 'suspended') this.ac.resume(); return; }
+    try {
+      this.ac = new (window.AudioContext || window.webkitAudioContext)();
+      const comp = this.ac.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4; comp.connect(this.ac.destination);
+      this.master = this.ac.createGain(); this.master.gain.value = G.save.muted ? 0 : 0.6; this.master.connect(comp);
+      const len = this.ac.sampleRate * 0.6, buf = this.ac.createBuffer(1, len, this.ac.sampleRate), d = buf.getChannelData(0), r = mulberry32(99);
+      for (let i = 0; i < len; i++) d[i] = r() * 2 - 1;
+      this.noise = buf; this.ambient();
+    } catch (e) { this.ac = null; }
+  },
+  setMuted(m){ if (this.master) this.master.gain.setTargetAtTime(m ? 0 : 0.6, this.ac.currentTime, 0.05); },
+  ok(){ return this.ac && !G.save.muted; },
+  // Фоновый гул: два низких тона с медленным фильтром — «тишина космоса», не музыка.
+  ambient(){
+    if (!this.ac || this.amb) return;
+    const g = this.ac.createGain(), lp = this.ac.createBiquadFilter(), lfo = this.ac.createOscillator(), lg = this.ac.createGain();
+    g.gain.value = CFG.AMBIENT_VOL; lp.type = 'lowpass'; lp.frequency.value = 380; lp.Q.value = 3;
+    lfo.frequency.value = 0.07; lg.gain.value = 180; lfo.connect(lg).connect(lp.frequency); lfo.start();
+    for (const [f, t] of [[55, 'sawtooth'], [82.4, 'triangle'], [110.3, 'sine']]){ const o = this.ac.createOscillator(); o.type = t; o.frequency.value = f; o.connect(lp); o.start(); }
+    lp.connect(g).connect(this.master); this.amb = g;
+  },
+  tone(freq, ms, type, vol, delay, freqTo){
+    if (!this.ok()) return;
+    const t = this.ac.currentTime + (delay || 0) / 1000, o = this.ac.createOscillator(), g = this.ac.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+    if (freqTo) o.frequency.exponentialRampToValueAtTime(freqTo, t + ms / 1000);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.25, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + ms / 1000 + 0.03);
+  },
+  hiss(ms, f0, f1, vol, delay, q, type){            // шум через фильтр с разворотом частоты: сопло, свист, щелчок
+    if (!this.ok()) return;
+    const t = this.ac.currentTime + (delay || 0) / 1000, src = this.ac.createBufferSource(), bp = this.ac.createBiquadFilter(), g = this.ac.createGain();
+    src.buffer = this.noise; bp.type = type || 'bandpass'; bp.Q.value = q || 1.2;
+    bp.frequency.setValueAtTime(f0, t); bp.frequency.exponentialRampToValueAtTime(f1, t + ms / 1000);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.3, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+    src.connect(bp).connect(g).connect(this.master); src.start(t); src.stop(t + ms / 1000 + 0.05);
+  },
+  // Металл: неравномерные обертоны с быстрым спадом — лязг стыковочного узла.
+  metal(f, vol, delay){ [1, 2.76, 5.4, 8.9].forEach((m, k) => this.tone(f * m, 260 / (1 + k * 0.6), k ? 'sine' : 'triangle', vol / (1 + k * 0.9), delay)); },
+  press(){ this.tone(280, 90, 'sine', 0.07, 0, 420); },
+  aim(){ this.tone(1500, 18, 'square', 0.025); },
+  launch(){ this.hiss(320, 450, 2600, 0.34); this.tone(120, 140, 'sine', 0.22, 0, 60); this.hiss(90, 6000, 3000, 0.08, 0, 2, 'highpass'); log('sound', 'launch'); },
+  dock(streak){                                       // лязг + две защёлки + перезвон; тон растёт с серией
+    this.tone(95, 120, 'sine', 0.3); this.metal(410, 0.16); this.hiss(40, 4000, 2500, 0.3, 0, 4);
+    this.hiss(25, 5000, 4000, 0.18, 85, 6); this.hiss(25, 5200, 4200, 0.16, 135, 6);
+    this.tone(PENTA[Math.min(PENTA.length - 1, streak)], 320, 'sine', 0.13, 70); this.tone(PENTA[Math.min(PENTA.length - 1, streak)] * 2, 200, 'sine', 0.04, 70);
+    log('sound', 'dock');
+  },
+  mirror(k){ this.tone(1760 + k * 220, 160, 'sine', 0.09); this.tone(2640 + k * 330, 90, 'sine', 0.04, 10); },
+  gate(open){ if (open){ this.hiss(380, 3000, 300, 0.2, 0, 2); this.tone(880, 320, 'sawtooth', 0.05, 0, 220); } else { this.tone(220, 200, 'sawtooth', 0.05, 0, 660); this.hiss(200, 300, 2500, 0.1, 0, 2); } },
+  word(){ [0, 1, 2].forEach(k => this.tone(1568 + k * 400, 90, 'triangle', 0.06, 160 + k * 55)); },
+  crooked(){ this.metal(230, 0.12); for (let k = 0; k < 3; k++) this.tone(150, 70, 'square', 0.07, 60 + k * 85); log('sound', 'crooked'); },
+  off(){ this.hiss(600, 2000, 250, 0.22); this.tone(900, 520, 'sine', 0.1, 40, 160); log('sound', 'off'); },
+  back(){ this.hiss(260, 1600, 500, 0.14); },
+  undo(){ this.hiss(30, 4000, 3000, 0.2, 0, 5); this.tone(330, 160, 'triangle', 0.14, 30, 640); log('sound', 'undo'); },
+  dead(){ this.tone(220, 200, 'triangle', 0.18); this.tone(165, 360, 'triangle', 0.18, 190); log('sound', 'dead'); },
+  win(){
+    this.tone(70, 900, 'sawtooth', 0.08, 0, 140); this.hiss(1100, 200, 3000, 0.12, 0, 0.7);
+    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => { this.tone(f, 420, 'triangle', 0.12, 120 + i * 85); this.tone(f * 2, 300, 'sine', 0.03, 120 + i * 85); });
+    log('sound', 'win');
+  },
+  star(k){ this.tone([784, 988, 1319][k] || 1319, 260, 'triangle', 0.16); this.metal([784, 988, 1319][k] || 1319, 0.05); },
+  lose(){ [392, 330, 262, 196].forEach((f, i) => this.tone(f, 260, 'triangle', 0.15, i * 150)); this.tone(60, 900, 'sawtooth', 0.06, 0, 40); log('sound', 'lose'); },
+  ui(){ this.tone(760, 40, 'triangle', 0.08); },
+};
+function buzz(p){ try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+
+// --- экраны: DOM-оверлеи, любой открывается кодом или хешем (§6, §11) ---
+const $ = (id) => document.getElementById(id);
+let starTimers = [];
+function goto(screen, payload){
+  G.screen = screen; log('screen', screen);
+  starTimers.forEach(clearTimeout); starTimers = [];
+  const ov = $('overlay'), card = $('card');
+  if (screen === 'game'){ ov.classList.remove('show'); return; }
+  ov.classList.add('show'); ov.classList.toggle('win', screen === 'win');
+  card.className = 'card ' + screen;
+  if (screen === 'menu'){
+    const cells = LEVELS.map((L, i) => {
+      const b = G.save.best[i] || 0, lock = i > G.save.open;
+      return '<button data-act="lvl" data-li="' + i + '"' + (lock ? ' disabled' : '') + (i === G.save.level ? ' class="cur"' : '') + '>' + (i + 1) +
+        '<span class="mini">' + [0, 1, 2].map(k => '<i class="star' + (k < b ? ' on' : '') + '"></i>').join('') + '</span></button>';
+    }).join('');
+    card.innerHTML = '<div class="emblem"></div><h2>Стыковка</h2><p>Собери станцию по чертежу. Модуль летит прямо и встаёт у первого, чего коснётся.</p>' +
+      '<div class="levels">' + cells + '</div><div class="row"><button class="primary" data-act="play">Играть</button> <button data-act="help">Как играть</button></div>';
+  }
+  if (screen === 'help') card.innerHTML = '<h2>Как играть</h2><ul class="help-list">' +
+    '<li>Тапни модуль у края — он полетит прямо и встанет перед первым, чего коснётся.</li>' +
+    '<li>Заполни пунктир. Панели с синими ячейками — только в жёлтый пунктир.</li>' +
+    '<li>Держи палец на модуле — увидишь, куда он встанет. Отпусти — полетит.</li>' +
+    '<li>Мимо станции или вне чертежа — минус батарейка. Отмена тоже стоит батарейку.</li>' +
+    '<li>Порядок важен: модуль может занять чужое место и закрыть дорогу.</li>' +
+    '<li>Глава 2: отражатель поворачивает модуль, ферма занимает две клетки, силовое поле пропускает после нескольких стыковок.</li></ul>' +
+    '<button class="primary" data-act="menu">Понятно</button>';
+  if (screen === 'win'){
+    const last = G.s && G.s.li >= LEVELS.length - 1, n = G.s ? starsFor(G.s) : 3;
+    card.innerHTML = '<div class="burst"></div><h2>' + (last ? 'Все станции на орбите!' : 'Станция на орбите!') + '</h2>' +
+      '<div class="stars big">' + [0, 1, 2].map(k => '<i class="star' + (k < n ? ' on pop' : '') + '" style="animation-delay:' + (0.25 + k * 0.28) + 's"></i>').join('') + '</div>' +
+      '<p>' + (payload || '') + '</p><div class="row">' + (last ? '<button class="primary" data-act="menu">В меню</button>' : '<button class="primary" data-act="next">Дальше</button>') +
+      ' <button data-act="retry">Ещё раз</button></div>';
+    for (let k = 0; k < n; k++) starTimers.push(setTimeout(() => { Sfx.star(k); buzz(12); }, 250 + k * 280));
+  }
+  if (screen === 'lose') card.innerHTML = '<h2>' + (payload === 'dead' ? 'Станцию не достроить' : 'Батарейки сели') + '</h2>' +
+    '<p>' + (payload === 'dead' ? 'Модуль занял чужое место, а на отмену заряда уже нет.' : 'Слишком много модулей ушло мимо чертежа.') + '</p>' +
+    '<div class="row"><button class="primary" data-act="retry">Ещё раз</button> <button data-act="menu">Меню</button></div>';
+}
+$('card').addEventListener('click', (e) => {
+  const b = e.target && e.target.closest ? e.target.closest('button') : null, act = b && b.dataset.act; if (!act) return;
+  Sfx.init(); Sfx.ui(); log('input', 'button', act);
+  if (act === 'play') startLevel(G.save.level);
+  else if (act === 'retry') startLevel(G.s ? G.s.li : G.save.level);
+  else if (act === 'next') startLevel(Math.min((G.s ? G.s.li : 0) + 1, LEVELS.length - 1));
+  else if (act === 'lvl') startLevel(+b.dataset.li);
+  else if (act === 'help') goto('help');
+  else goto('menu');
+});
+function fromHash(){
+  const h = location.hash.slice(1), m = /^level=(\d+)$/.exec(h);
+  if (m) return startLevel(Math.max(0, Math.min(LEVELS.length, +m[1]) - 1));
+  if (h === 'game') return startLevel(G.save.level);
+  if ((h === 'win' || h === 'lose') && !G.s) G.s = createState(G.save.level);
+  if (h && h !== G.screen) goto(h);
+}
+window.addEventListener('hashchange', fromHash);
+
+let toastUntil = 0;
+function toast(msg, bad){ const t = $('toast'); t.textContent = msg; t.classList.toggle('bad', !!bad); t.classList.remove('hide'); toastUntil = clock() + CFG.TOAST_MS; }
+// Объяснение промаха тостом только первые CFG.TOAST_REPEAT раз — дальше хватает слова на месте (без попапа на каждый ход).
+function explain(kind, msg){ G.told[kind] = (G.told[kind] || 0) + 1; if (G.told[kind] <= CFG.TOAST_REPEAT) toast(msg, true); }
+
+function startLevel(li){
+  li = Math.max(0, Math.min(LEVELS.length - 1, li));
+  G.s = createState(li); G.flights = []; G.fx = []; G.parts = []; G.cellFx = {}; G.sched = []; G.mirrorHit = {}; G.pending.clear(); G.laneBusy = {}; G.laneSlide = {};
+  G.press = null; G.ending = null; G.winAt = 0; G.loseAt = 0; G.streak = 0; G.lastInput = clock(); G.hintKey = '';
+  G.introAt = RM ? clock() - CFG.INTRO_MS : clock();
+  G.save.level = li; save();
+  const L = LEVELS[li];
+  $('banner').innerHTML = '<span class="ttl">' + (L.title || '') + '</span>' + (L.hint ? '<small>' + L.hint + '</small>' : '');
+  $('toast').classList.add('hide');
+  log('event', 'level.start', 'level=' + (li + 1) + ' modules=' + G.s.total + ' lanes=' + G.s.lanes.length);
+  log('fx.start', 'intro');
+  goto('game'); hud(true);
+}
+let prevBat = CFG.BATTERIES, prevPlaced = 0;
+function hud(reset){
+  const s = G.s;
+  $('hud-level').textContent = 'Уровень ' + (s ? s.li + 1 : 1);
+  $('hud-count').textContent = s ? s.placed + ' / ' + s.total : '';
+  $('prog-fill').style.width = s ? (100 * s.placed / s.total).toFixed(1) + '%' : '0%';
+  if (s && !reset && s.placed > prevPlaced){ const el = $('prog'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+  prevPlaced = s ? s.placed : 0;
+  // батарейка гаснет, когда промах случился на экране (модуль долетел), а не в момент тапа
+  const owed = G.flights.filter(f => !f.arrived && f.res !== 'dock' && f.res !== 'undo').length * CFG.MISS_COST;
+  const bats = $('bats').children, bat = s ? s.bat + owed : CFG.BATTERIES;
+  for (let k = 0; k < bats.length; k++){
+    bats[k].classList.toggle('off', k >= bat);
+    if (!reset && k >= bat && k < prevBat){ bats[k].classList.remove('blink'); void bats[k].offsetWidth; bats[k].classList.add('blink'); }
+  }
+  prevBat = bat;
+  $('btn-undo').disabled = !(s && canUndo(s) && !G.ending);
+  $('btn-undo').classList.toggle('pulse', !!(s && s.dead && canUndo(s)));
+  $('btn-mute').innerHTML = G.save.muted
+    ? '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#9aa3c2"/><path d="M16 9l5 6M21 9l-5 6" stroke="#9aa3c2" stroke-width="2"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#f2f4fb"/><path d="M16 8.5c1.6 1.8 1.6 5.2 0 7M18.5 6c3 3.3 3 8.7 0 12" stroke="#f2f4fb" stroke-width="2" fill="none"/></svg>';
+}
+
+// --- геометрия: поле g×g в центре, очереди по краям; всё в виртуальных юнитах (§2) ---
+const cv = $('cv'), ctx = cv.getContext('2d');
+const VW = 400;                                    // виртуальная ширина; логика в виртуальных юнитах (§2)
+let scale = 1, W = VW, H = 640, DPR = 1;
+function geom(){
+  const gw = G.s.w, gh = G.s.h, m = laneMargins(G.s);
+  const top = 34;                                                                      // место под название уровня
+  const cell = Math.min(CFG.CELL_MAX, W / (gw + 2 * m.side), (H - top) / (gh + 2 * m.tb));
+  const ox = (W - gw * cell) / 2, oy = top + (H - top - gh * cell) / 2;
+  return { gw, gh, cell, ox, oy };
+}
+// Поля под очереди (в клетках) — по самой длинной очереди уровня слева/справа и сверху/снизу (ферма длиннее модуля).
+const margCache = new WeakMap();
+function laneMargins(s){
+  if (margCache.has(s.lanes)) return margCache.get(s.lanes);
+  let side = 0.9, tb = 0.9;
+  for (const ln of s.lanes){ const o = qOffsets(ln, 0), ext = o.length ? o[o.length - 1].far + 0.12 : 0;
+    if (ln.side === 'L' || ln.side === 'R') side = Math.max(side, ext); else tb = Math.max(tb, ext); }
+  const m = { side, tb }; margCache.set(s.lanes, m); return m;
+}
+// Раскладка очереди с модуля from: центр каждого (off, клеток от кромки поля), масштаб и дальний край.
+// Передний — крупнее (Q_SCALE0), остальные — Q_SCALEK; ферма в 2,25 раза длиннее модуля.
+function qOffsets(lane, from){
+  const out = []; let edge = CFG.Q_EDGE0;
+  for (let k = from; k < lane.q.length; k++){
+    const sc = k === from ? CFG.Q_SCALE0 : CFG.Q_SCALEK, vl = sc * (MOD_LEN[lane.q[k]] > 1 ? CFG.TRUSS_VL : 1);
+    out.push({ k, off: edge + vl / 2, sc, far: edge + vl }); edge += vl + CFG.Q_GAP;
+  }
+  return out;
+}
+function cellXY(geo, i){ return { x: geo.ox + (i % geo.gw + 0.5) * geo.cell, y: geo.oy + (Math.floor(i / geo.gw) + 0.5) * geo.cell }; }
+function angOf(side){ const d = DIR[side]; return Math.atan2(d[1], d[0]); }
+// Место k-го модуля очереди (k = 0 — передний), k может быть дробным во время сдвига.
+function slotXY(geo, lane, k){ return slotAt(geo, lane, CFG.Q_OFF0 + CFG.Q_STEP * k); }
+// Точка на линии очереди в off клетках от кромки поля наружу.
+function slotAt(geo, lane, off){
+  const o = off * geo.cell, mid = (lane.idx + 0.5) * geo.cell;
+  if (lane.side === 'L') return { x: geo.ox - o, y: geo.oy + mid };
+  if (lane.side === 'R') return { x: geo.ox + geo.gw * geo.cell + o, y: geo.oy + mid };
+  if (lane.side === 'T') return { x: geo.ox + mid, y: geo.oy - o };
+  return { x: geo.ox + mid, y: geo.oy + geo.gh * geo.cell + o };
+}
+// Передний модуль очереди li сейчас: точка, размер (px) и тип.
+function frontOf(geo, s, li){
+  const ln = s.lanes[li], o = qOffsets(ln, Math.min(s.ptr[li], ln.q.length - 1))[0];
+  return { p: slotAt(geo, ln, o.off), size: geo.cell * o.sc, kind: ln.q[o.k] };
+}
+function slotSize(geo, k){ return geo.cell * (k <= 0 ? CFG.Q_SCALE0 : k >= 1 ? CFG.Q_SCALEK : CFG.Q_SCALE0 + (CFG.Q_SCALEK - CFG.Q_SCALE0) * k); }
+// Точка вылета за дальний край поля (для промаха «улетел»).
+function exitXY(geo, lane){
+  const p = slotXY(geo, lane, 0), d = DIR[lane.side], far = ((DIR[lane.side][0] ? geo.gw : geo.gh) + 2 * CFG.Q_OFF0 + 3) * geo.cell;
+  return { x: p.x + d[0] * far, y: p.y + d[1] * far };
+}
+// Путь полёта ломаной: от очереди через отражатели к месту стыковки (ферма — к середине своих двух клеток);
+// «улетел» — за край по итоговому направлению; застрял на отражателе — до него.
+function flightPath(geo, L, from){
+  const pts = [from], d = L.dir, c = geo.cell;
+  for (const t of L.turns) pts.push(cellXY(geo, t));
+  if (L.res === 'dock' || L.res === 'crooked'){
+    const a = cellXY(geo, L.cells[0]);
+    if (MOD_LEN[L.kind] > 1){ const b = L.cells[1] !== undefined ? cellXY(geo, L.cells[1]) : { x: a.x - d[0] * c, y: a.y - d[1] * c }; pts.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }); }
+    else pts.push(a);
+  } else if (L.res === 'off'){
+    const q = L.path.length ? cellXY(geo, L.path[L.path.length - 1]) : from, far = (Math.max(geo.gw, geo.gh) + 4) * c;
+    pts.push({ x: q.x + d[0] * far, y: q.y + d[1] * far });
+  } else if (L.path.length) pts.push(cellXY(geo, L.path[L.path.length - 1]));
+  else pts.push({ x: from.x + d[0] * c * 0.35, y: from.y + d[1] * c * 0.35 });
+  const lens = [0];
+  for (let k = 1; k < pts.length; k++) lens.push(lens[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y));
+  return { pts, lens, total: lens[lens.length - 1] || 1 };
+}
+// Точка на ломаной на доле пути p (0..1) и угол текущего отрезка.
+function pathAt(fp, p){
+  const L = Math.max(0, Math.min(1, p)) * fp.total; let k = 1;
+  while (k < fp.lens.length - 1 && fp.lens[k] < L) k++;
+  const a = fp.pts[k - 1], b = fp.pts[k] || a, seg = (fp.lens[k] - fp.lens[k - 1]) || 1, u = (L - fp.lens[k - 1]) / seg;
+  return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, ang: Math.atan2(b.y - a.y, b.x - a.x) };
+}
+const flyPos = (u) => 0.45 * u * u + 0.55 * u;                       // разгон: доля пути от доли времени
+const flyTime = (p) => (-0.55 + Math.sqrt(0.3025 + 1.8 * p)) / 0.9;   // обратная к flyPos
+// Точка сразу за дальним краем поля на линии очереди: там превью ставит крестик «улетит».
+function farXY(geo, lane, L){
+  if (L && L.path.length){                                            // с учётом поворотов: за краем по итоговому направлению
+    const i = L.path[L.path.length - 1], x = i % geo.gw, y = Math.floor(i / geo.gw), d = L.dir, q = cellXY(geo, i);
+    const steps = d[0] > 0 ? geo.gw - 1 - x : d[0] < 0 ? x : d[1] > 0 ? geo.gh - 1 - y : y;
+    return { x: q.x + d[0] * (steps + 0.95) * geo.cell, y: q.y + d[1] * (steps + 0.95) * geo.cell };
+  }
+  const mid = (lane.idx + 0.5) * geo.cell, o = geo.cell * 0.45;
+  if (lane.side === 'L') return { x: geo.ox + geo.gw * geo.cell + o, y: geo.oy + mid };
+  if (lane.side === 'R') return { x: geo.ox - o, y: geo.oy + mid };
+  if (lane.side === 'T') return { x: geo.ox + mid, y: geo.oy + geo.gh * geo.cell + o };
+  return { x: geo.ox + mid, y: geo.oy - o };
+}
+// Какая очередь под пальцем: полоса шириной в клетку от края поля наружу.
+function laneAt(p){
+  if (!G.s) return -1;
+  const geo = geom(), gw = geo.gw, gh = geo.gh, c = geo.cell;
+  const fx = (p.x - geo.ox) / c, fy = (p.y - geo.oy) / c;
+  let side = null, idx = -1;
+  if (fx < 0 && fy >= -0.15 && fy < gh + 0.15){ side = 'L'; idx = Math.floor(fy); }
+  else if (fx > gw && fy >= -0.15 && fy < gh + 0.15){ side = 'R'; idx = Math.floor(fy); }
+  else if (fy < 0 && fx >= -0.15 && fx < gw + 0.15){ side = 'T'; idx = Math.floor(fx); }
+  else if (fy > gh && fx >= -0.15 && fx < gw + 0.15){ side = 'B'; idx = Math.floor(fx); }
+  if (!side) return -1;
+  idx = Math.max(0, Math.min((side === 'L' || side === 'R' ? gh : gw) - 1, idx));
+  const live = (li) => li >= 0 && G.s.ptr[li] < G.s.lanes[li].q.length;
+  let li = G.s.lanes.findIndex(l => l.side === side && l.idx === idx);
+  if (live(li)) return li;
+  // промах на полклетки — берём соседнюю живую очередь той же стороны
+  const f = side === 'L' || side === 'R' ? fy : fx, near = f - idx < 0.5 ? idx - 1 : idx + 1;
+  li = G.s.lanes.findIndex(l => l.side === side && l.idx === near);
+  return live(li) && Math.abs(f - (near + 0.5)) < 0.85 ? li : -1;
+}
+
+
+// --- частицы: движение аналитическое от t0 (сопротивление и гравитация в формуле), без накопления dt (§4) ---
+let partSeed = 1;
+function emit(type, x, y, n, o){
+  const r = mulberry32((partSeed++) * 2654435761);
+  for (let k = 0; k < n && G.parts.length < CFG.PARTS_MAX; k++){
+    const a = (o.ang || 0) + (r() - 0.5) * (o.spread || 6.283), v = (o.v || 60) * (0.5 + r() * 0.8);
+    G.parts.push({ type, x: x + (r() - 0.5) * (o.jit || 0), y: y + (r() - 0.5) * (o.jit || 0), vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+      g: o.g || 0, drag: o.drag || 3, t0: o.t0 || clock(), t1: (o.t0 || clock()) + (o.life || 400) * (0.6 + r() * 0.6),
+      r: (o.r || 2) * (0.6 + r() * 0.8), col: o.cols ? o.cols[Math.floor(r() * o.cols.length)] : o.col, rot: r() * 6.28, vr: (r() - 0.5) * 12 });
+  }
+}
+function partPos(p, now){
+  const t = Math.max(0, now - p.t0) / 1000, d = (1 - Math.exp(-p.drag * t)) / p.drag;
+  return { x: p.x + p.vx * d, y: p.y + p.vy * d + 0.5 * p.g * t * t, t };
+}
+function word(text, x, y, col, big){ G.fx.push({ type: 'word', text, x, y, col, big: !!big, t0: clock(), t1: clock() + CFG.WORD_MS }); }
+
+// --- ход: ядро меняется сразу, экран догоняет анимацией по дедлайнам ---
+function launch(li){
+  const s = G.s;
+  if (!s || G.screen !== 'game' || G.ending || li < 0 || li >= s.lanes.length) return false;
+  if ((G.laneBusy[li] || 0) > clock()) return false;
+  const L = landing(s, li); if (!L) return false;
+  const now = clock(), geo = geom(), lane = s.lanes[li], fr = frontOf(geo, s, li), from = fr.p, ang = angOf(lane.side);
+  G.s = applyMove(s, li); G.lastInput = now;
+  log('input', 'tap', 'lane=' + lane.side + lane.idx + ' res=' + L.res + (L.turns.length ? ' turns=' + L.turns.length : ''));
+  Sfx.launch(); buzz(10);
+  // выхлоп из сопла назад и кольцо давления
+  const back = fr.size * (MOD_LEN[L.kind] > 1 ? CFG.TRUSS_VL : 1) / 2 + geo.cell * 0.08;
+  const bx = from.x - Math.cos(ang) * back, by = from.y - Math.sin(ang) * back;
+  emit('puff', bx, by, 9, { ang: ang + Math.PI, spread: 1.6, v: 120, drag: 5, life: 520, r: geo.cell * 0.12, col: '#c9d2f2' });
+  G.fx.push({ type: 'ring', x: bx, y: by, t0: now, t1: now + 280, r0: geo.cell * 0.15, r1: geo.cell * 0.7, col: '#ffd27a' });
+  const fp = flightPath(geo, L, from);
+  const fl = { li, kind: L.kind, res: L.res, cell: L.cell, cells: L.cells, hit: L.hit, dir: L.dir, ang, t0: now, from, fp, size0: fr.size };
+  const dist = fp.total / geo.cell;
+  fl.t1 = now + (L.res === 'blocked' && !L.path.length ? 120 : Math.max(CFG.FLY_MIN_MS, dist / CFG.FLY_CPS * 1000));
+  // модуль, который встаёт на ещё летящий, не обгоняет его на экране
+  if (L.res === 'dock') for (const o of G.flights) if (o.res === 'dock' && !o.arrived && o.cells && o.cells.includes(L.hit)) fl.t1 = Math.max(fl.t1, o.t1 + 60);
+  // отражатели вспыхивают и звенят в момент, когда модуль через них проходит
+  for (let k = 0; k < L.turns.length; k++){
+    const at = now + flyTime(fp.lens[k + 1] / fp.total) * (fl.t1 - now), q = fp.pts[k + 1];
+    G.fx.push({ type: 'flash', x: q.x, y: q.y, t0: at, t1: at + 260, r: geo.cell * 0.9, col: css('--bp') });
+    G.sched.push({ at, fn: () => { Sfx.mirror(k); G.mirrorHit[L.turns[k]] = clock(); } });
+  }
+  if (L.res === 'dock'){ for (const c of L.cells) G.pending.add(c); G.laneSlide[li] = now; G.laneBusy[li] = now + 90; }
+  else { fl.back0 = fl.t1 + (L.res === 'off' ? 160 : CFG.WOBBLE_MS); fl.back1 = fl.back0 + CFG.RETURN_MS; G.laneBusy[li] = fl.back1; }
+  G.flights.push(fl); log('fx.start', 'flight', 'res=' + L.res);
+  G.press = null; G.hintKey = '';
+  hud(); return true;
+}
+// Модуль долетел (вызывается из кадра по дедлайну).
+function arrive(fl, now){
+  const geo = geom(), s = G.s, c = geo.cell, d = fl.dir, angEnd = Math.atan2(d[1], d[0]);
+  fl.arrived = true;
+  if (fl.res === 'dock'){
+    for (const k of fl.cells) G.pending.delete(k);
+    const p = cellXY(geo, fl.cell), sx = p.x + d[0] * c * 0.5, sy = p.y + d[1] * c * 0.5;     // шов — передний край модуля
+    for (const k of fl.cells) G.cellFx[k] = { t0: now, ang: angEnd };
+    const mid = fl.fp.pts[fl.fp.pts.length - 1], rr = MOD_LEN[fl.kind] > 1 ? c * 0.95 : c * 0.45;
+    G.fx.push({ type: 'ring', x: mid.x, y: mid.y, t0: now, t1: now + CFG.DOCK_FX_MS, r0: rr, r1: rr + c * 0.7, col: kindCol(fl.kind), sq: true });
+    G.fx.push({ type: 'flash', x: sx, y: sy, t0: now, t1: now + 260, r: c * 1.3, col: css('--lamp') });
+    emit('spark', sx, sy, 14, { ang: angEnd + Math.PI, spread: 3.4, v: 260, drag: 6, life: 420, r: c * 0.05, col: css('--lamp') });
+    emit('spark', sx, sy, 6, { ang: angEnd + Math.PI / 2, spread: 0.5, v: 200, drag: 7, life: 300, r: c * 0.04, col: '#ffffff' });
+    emit('spark', sx, sy, 6, { ang: angEnd - Math.PI / 2, spread: 0.5, v: 200, drag: 7, life: 300, r: c * 0.04, col: '#ffffff' });
+    G.shakeUntil = now + CFG.SHAKE_MS; G.shakeAng = angEnd; G.shakeAmp = MOD_LEN[fl.kind] > 1 ? 1.5 : 1;
+    G.streak = s.dead ? 0 : G.streak + 1;                 // ход в тупик не хвалим
+    Sfx.dock(Math.max(0, G.streak - 1)); if (MOD_LEN[fl.kind] > 1) Sfx.metal(180, 0.14, 40); buzz(18);
+    gatesOpened(geo, s, now);
+    if (isWin(s)){ let top = p.y; for (let i = 0; i < s.occ.length; i++) if (s.occ[i] > 0 || s.occ[i] === CORE) top = Math.min(top, cellXY(geo, i).y);
+      word('Есть стыковка!', W / 2, top - c * 0.9, css('--ok'), true); }
+    else if (!s.dead && CFG.STREAK_WORDS[G.streak]){ word(CFG.STREAK_WORDS[G.streak], p.x, p.y - c * 0.7, css('--lamp')); Sfx.word(); }
+    log('fx.end', 'flight', 'dock'); log('event', 'dock', 'cell=' + fl.cell + ' placed=' + s.placed + '/' + s.total + ' streak=' + G.streak);
+  } else {
+    G.streak = 0;
+    const lane = s.lanes[fl.li], at = fl.res === 'off' ? farXY(geo, lane, fl) : fl.fp.pts[fl.fp.pts.length - 1];
+    G.fx.push({ type: 'batt', x: at.x, y: at.y - c * 0.2, t0: now + 80, t1: now + 1000 });
+    if (fl.res === 'off'){
+      Sfx.off(); buzz(30); log('event', 'miss', 'off');
+      G.fx.push({ type: 'edge', side: d[0] > 0 ? 'L' : d[0] < 0 ? 'R' : d[1] > 0 ? 'T' : 'B', t0: now, t1: now + 450 });
+      word('Мимо!', at.x, at.y - c * 0.6, css('--bad'));
+      explain('off', 'Мимо станции — модуль улетел. Он вернётся, но батарейка потрачена');
+    } else {
+      Sfx.crooked(); buzz([30, 30, 30]); log('event', 'miss', fl.res);
+      G.fx.push({ type: 'flash', x: at.x, y: at.y, t0: now, t1: now + 300, r: c * 1.2, col: css('--bad') });
+      G.shakeUntil = now + CFG.SHAKE_MS; G.shakeAng = angEnd; G.shakeAmp = 0.6;
+      emit('spark', at.x + d[0] * c * 0.45, at.y + d[1] * c * 0.45, 8, { ang: angEnd + Math.PI, spread: 2.6, v: 180, drag: 6, life: 320, r: c * 0.045, col: css('--bad') });
+      const truss = MOD_LEN[fl.kind] > 1, onTrussBp = fl.cells.some(k => s.bp[k] === TRUSS);
+      if (fl.res === 'blocked' && fl.fp.pts.length > 2){ word('Застрял', at.x, at.y - c * 0.6, css('--bad')); explain('stuck', 'Сразу за отражателем преграда — модулю некуда встать'); }
+      else if (fl.res === 'blocked'){ word('Занято', at.x, at.y - c * 0.6, css('--bad')); explain('blocked', truss ? 'Ферме не хватает места: она длиной в две клетки' : 'Линия занята у самого края — модулю некуда встать'); }
+      else if (truss && fl.cells.length < 2){ word('Торчит!', at.x, at.y - c * 0.6, css('--bad')); explain('stick', 'Ферма длиной в две клетки — тут она торчит за край'); }
+      else if (truss || onTrussBp){ word('Не та ферма', at.x, at.y - c * 0.6, css('--bad')); explain('truss', 'Ферма встаёт только целиком в свой двойной пунктир'); }
+      else if (fl.cells.some(k => s.bp[k])){ word('Не тот тип', at.x, at.y - c * 0.6, css('--bad')); explain('kind', 'Панель с синими ячейками — только в жёлтый пунктир, белый модуль — в голубой'); }
+      else { word('Кривая!', at.x, at.y - c * 0.6, css('--bad')); explain('crooked', 'Вне чертежа — станция кривая. Модуль вернётся, батарейка потрачена'); }
+    }
+  }
+  afterMove(now);
+}
+// Поля, чей порог совпал с числом стыковок: снимаются с вспышкой, искрами и звуком.
+function gatesOpened(geo, s, now){
+  for (const i of s.gates) if (s.gate[i] === s.hist.length){
+    const p = cellXY(geo, i);
+    G.fx.push({ type: 'flash', x: p.x, y: p.y, t0: now + 60, t1: now + 520, r: geo.cell * 1.4, col: css('--gate') });
+    G.fx.push({ type: 'ring', x: p.x, y: p.y, t0: now + 60, t1: now + 520, r0: geo.cell * 0.4, r1: geo.cell * 1.3, col: css('--gate'), sq: true });
+    emit('spark', p.x, p.y, 16, { spread: 6.28, v: 220, drag: 5, life: 460, r: geo.cell * 0.045, col: css('--gate'), t0: now + 60 });
+    word('Поле снято', p.x, p.y - geo.cell * 0.7, css('--gate'));
+    G.sched.push({ at: now + 60, fn: () => Sfx.gate(true) }); log('event', 'gate.open', 'cell=' + i);
+  }
+}
+function afterMove(now){
+  const s = G.s; hud();
+  if (G.ending) return;
+  if (isWin(s) && !G.flights.some(f => !f.arrived)){
+    G.ending = { kind: 'win', at: now + 300 }; log('event', 'level.win', 'level=' + (s.li + 1) + ' bat=' + s.bat + ' taps=' + s.moves);
+  } else if (isLose(s) && !G.flights.some(f => !f.arrived || (f.back1 && f.back1 > now))){
+    const why = s.bat <= 0 ? 'bat' : 'dead';
+    G.ending = { kind: 'lose', at: now + CFG.LOSE_DELAY_MS + 400, why }; G.loseAt = now; Sfx.lose(); buzz([60, 40, 60]);
+    log('event', 'level.lose', 'why=' + why); log('fx.start', 'blackout');
+  } else if (s.dead && !G.flights.some(f => !f.arrived)){
+    Sfx.dead(); toast('Тупик: модуль занял чужое место. Отмени его', true); log('event', 'dead');
+  }
+}
+function undo(){
+  const s = G.s; if (!s || G.screen !== 'game' || G.ending || !canUndo(s) || G.flights.some(f => !f.arrived)) return;
+  const h = s.hist[s.hist.length - 1], geo = geom(), lane = s.lanes[h.li], now = clock(), ang = angOf(lane.side);
+  const kind = s.occ[h.cell], a = cellXY(geo, h.cells[0]), b = h.cells[1] !== undefined ? cellXY(geo, h.cells[1]) : a, p = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  G.s = undoMove(s); G.lastInput = now; G.streak = 0; Sfx.undo(); buzz(12); log('input', 'undo', 'lane=' + lane.side + lane.idx);
+  for (const c of h.cells) delete G.cellFx[c];
+  for (const i of s.gates) if (s.gate[i] === s.hist.length){ const q = cellXY(geo, i); G.fx.push({ type: 'flash', x: q.x, y: q.y, t0: now, t1: now + 400, r: geo.cell * 1.1, col: css('--gate') }); Sfx.gate(false); }
+  emit('puff', a.x + Math.cos(ang) * geo.cell * 0.5, a.y + Math.sin(ang) * geo.cell * 0.5, 7, { spread: 6.28, v: 70, drag: 5, life: 420, r: geo.cell * 0.1, col: '#c9d2f2' });
+  // модуль отстёгивается и пятится в очередь обратной тягой — по тому же пути, что прилетел
+  const L = { res: 'dock', kind, cells: h.cells, turns: [], dir: DIR[lane.side], path: [] };
+  const tr = trace(fieldOf(G.s), lane.side, lane.idx, MOD_LEN[kind]); L.turns = tr.turns; L.dir = tr.dir;
+  const fr = frontOf(geo, G.s, h.li), fp = flightPath(geo, L, fr.p);
+  G.flights.push({ li: h.li, kind, res: 'undo', cell: h.cell, cells: h.cells, ang, t0: now, t1: now + 320, fp, size0: fr.size, arrived: true });
+  G.laneBusy[h.li] = now + 320; G.hintKey = '';
+  hud(); if (isLose(G.s)) afterMove(now);
+}
+function finishEnding(now){
+  const e = G.ending; if (!e) return;
+  if (e.kind === 'win'){
+    if (!G.winAt){
+      G.winAt = now; Sfx.win(); buzz([20, 40, 20, 40, 60]); log('fx.start', 'lights');
+      const geo = geom(), cp = cellXY(geo, G.s.core[0]), c = geo.cell;
+      G.fx.push({ type: 'ring', x: cp.x, y: cp.y, t0: now, t1: now + 900, r0: c * 0.5, r1: c * 6, col: css('--lamp'), w: 6 });
+      G.fx.push({ type: 'flash', x: cp.x, y: cp.y, t0: now, t1: now + 700, r: c * 4, col: css('--bp') });
+      if (!RM) emit('confetti', cp.x, cp.y, CFG.CONFETTI_N, { ang: -Math.PI / 2, spread: 4.2, v: 520, drag: 1.6, g: 520, life: 1900, r: c * 0.09,
+        cols: [css('--bp'), css('--solar'), css('--ok'), '#ff8fb1', '#ffffff'] });
+      e.at = now + CFG.WIN_DELAY_MS; return;
+    }
+    const li = G.s.li, stars = starsFor(G.s);
+    G.save.best[li] = Math.max(G.save.best[li] || 0, stars);
+    G.save.open = Math.max(G.save.open, Math.min(li + 1, LEVELS.length - 1));
+    G.save.level = Math.min(li + 1, LEVELS.length - 1); save();
+    log('fx.end', 'lights'); log('event', 'reward', 'stars=' + stars);
+    G.ending = null;
+    goto('win', 'Модулей ' + G.s.total + ' · промахов ' + G.s.misses + (G.s.undos ? ' · отмен ' + G.s.undos : ''));
+  } else { G.ending = null; log('fx.end', 'blackout'); goto('lose', e.why); }
+}
+
+// --- ввод: Pointer Events; палец на очереди показывает траекторию, отпустил — летит (§3) ---
+function toVirtual(e){ const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }; }
+function pressLane(li){
+  if (!G.press || G.press.li === li) return;
+  G.press.li = li; G.press.since = clock();
+  if (li >= 0){ Sfx.aim(); buzz(4); }
+}
+cv.addEventListener('pointerdown', (e) => {
+  Sfx.init();
+  if (G.screen !== 'game' || G.ending) return;
+  const li = laneAt(toVirtual(e));
+  G.press = { id: e.pointerId, li, since: clock() };
+  if (li >= 0){ Sfx.press(); buzz(5); }
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+});
+cv.addEventListener('pointermove', (e) => {
+  if (!G.press || e.pointerId !== G.press.id) return;
+  pressLane(laneAt(toVirtual(e)));                     // палец можно вести вдоль края — превью переключается
+});
+function onUp(e){
+  if (!G.press || e.pointerId !== G.press.id) return;
+  const li = e.type === 'pointercancel' ? -1 : laneAt(toVirtual(e));
+  G.press = null;
+  if (li >= 0) launch(li);
+}
+cv.addEventListener('pointerup', onUp); cv.addEventListener('pointercancel', onUp);
+document.addEventListener('keydown', (e) => {          // дубли на клавиатуру для отладки (§3)
+  if (!G.s) return;
+  const k = '123456789acdf'.indexOf(e.key.toLowerCase());
+  if (k >= 0 && G.screen === 'game') { launch(k); return; }
+  if (e.key === 'z' || e.key === 'u') undo();
+  if (e.key === 'r') startLevel(G.s.li);
+  if (e.key === 'm') goto('menu');
+  if (e.key === 'h') G.lastInput = -1e9;
+});
+$('btn-undo').onclick = () => { Sfx.init(); log('input', 'button', 'undo'); undo(); };
+$('btn-reset').onclick = () => { Sfx.init(); Sfx.ui(); log('input', 'button', 'reset'); startLevel(G.s ? G.s.li : 0); };
+$('btn-menu').onclick = () => { Sfx.init(); Sfx.ui(); log('input', 'button', 'menu'); goto('menu'); };
+$('btn-mute').onclick = () => { Sfx.init(); G.save.muted = !G.save.muted; Sfx.setMuted(G.save.muted); save(); hud(); log('input', 'button', 'mute=' + G.save.muted); };
+
+// --- размер: resize + orientationchange + периодический пересчёт (§2) ---
+function fit(){
+  const r = $('game').getBoundingClientRect(); if (!r.width || !r.height) return;
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  scale = r.width / VW; W = VW; H = r.height / scale;
+  const w = Math.round(r.width * DPR), h = Math.round(r.height * DPR);
+  if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+}
+let fitTimer = 0;
+const refit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fit, 140); };
+window.addEventListener('resize', refit); window.addEventListener('orientationchange', refit);
+setInterval(fit, 800);
+document.addEventListener('visibilitychange', () => { G.paused = document.hidden; log('event', G.paused ? 'pause' : 'resume'); });
+
+
+// --- рендер: всё в canvas, цвета из CSS-переменных (§9) ---
+const cssCache = {};
+function css(name){ return cssCache[name] || (cssCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#f0f'); }
+const kindCol = (k) => k === SOLAR ? css('--solar') : k === TRUSS ? css('--truss') : css('--bp');
+const ease = (u) => u < 0 ? 0 : u > 1 ? 1 : u;
+const easeOut = (u) => 1 - Math.pow(1 - ease(u), 3);
+const easeOutBack = (u) => { u = ease(u); const k = 1.70158; return 1 + (k + 1) * Math.pow(u - 1, 3) + k * Math.pow(u - 1, 2); };
+const bump = (u) => u <= 0 || u >= 1 ? 0 : Math.sin(u * Math.PI) * (1 - u);        // короткий толчок 0→пик→0 с затуханием
+const STARS = (() => { const r = mulberry32(7), out = []; for (let k = 0; k < 70; k++) out.push({ x: r(), y: r(), s: 0.6 + r() * 1.4, ph: r() * 6.28, z: 0.3 + r() * 0.7 }); return out; })();
+
+// Спрайт свечения: радиальный градиент цвета в прозрачность, 64 px, кэш по цвету. Рисуется с 'lighter'.
+const glowCache = {};
+function glowSprite(col){
+  if (glowCache[col]) return glowCache[col];
+  const g = document.createElement('canvas'); g.width = g.height = 64; const c = g.getContext('2d');
+  const gr = c.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, col); gr.addColorStop(0.35, col + '88'); gr.addColorStop(1, col + '00');
+  c.fillStyle = gr; c.fillRect(0, 0, 64, 64); return (glowCache[col] = g);
+}
+function drawGlow(c, x, y, r, col, a){
+  if (a <= 0.01) return;
+  c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = Math.min(1, a); c.drawImage(glowSprite(col), x - r, y - r, r * 2, r * 2); c.restore();
+}
+
+// Задник: градиент, туманности, дальние звёзды, планета с кольцом и луна. Статичный — рисуется в свой холст при смене размера.
+const BG = { cv: document.createElement('canvas'), key: '' };
+// Палитры глав: космос, туманности [x, y, радиус, цвет, яркость], планета (свет, тень, атмосфера), кольцо.
+const CHAPTERS = {
+  1: { sky: ['#0b1026', '#1b2458'], neb: [[0.12, 0.22, 0.75, '#7b4bd6', 0.30], [0.95, 0.5, 0.6, '#2bb3c9', 0.20], [0.35, 0.95, 0.7, '#d14b8f', 0.16], [0.7, 0.1, 0.4, '#4b6bd6', 0.18]],
+       planet: ['#5a74e0', '#1c2563', 'rgba(140,190,255,0.45)', 'rgba(90,120,230,0.25)'], ring: true },
+  2: { sky: ['#160b1e', '#3a1631'], neb: [[0.15, 0.2, 0.7, '#d1563b', 0.26], [0.92, 0.45, 0.6, '#c94bd6', 0.18], [0.3, 0.92, 0.7, '#ff9f43', 0.14], [0.75, 0.08, 0.4, '#7b4bd6', 0.16]],
+       planet: ['#e07a4a', '#5a1d14', 'rgba(255,180,140,0.45)', 'rgba(150,50,30,0.35)'], ring: false },
+};
+function drawBackdrop(c){
+  const ch = CHAPTERS[(G.s && LEVELS[G.s.li].ch) || 1], key = cv.width + 'x' + cv.height + ':' + ((G.s && LEVELS[G.s.li].ch) || 1);
+  if (BG.key !== key){
+    BG.key = key; BG.cv.width = cv.width; BG.cv.height = cv.height;
+    const b = BG.cv.getContext('2d'); b.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
+    const gr = b.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, ch.sky[0]); gr.addColorStop(1, ch.sky[1]);
+    b.fillStyle = gr; b.fillRect(0, 0, W, H);
+    for (const [x, y, r, col, a] of ch.neb){
+      const ng = b.createRadialGradient(x * W, y * H, 0, x * W, y * H, r * W);
+      ng.addColorStop(0, col + Math.round(a * 255).toString(16).padStart(2, '0')); ng.addColorStop(1, col + '00');
+      b.fillStyle = ng; b.fillRect(0, 0, W, H);
+    }
+    const rs = mulberry32(11);
+    for (let k = 0; k < 170; k++){ b.globalAlpha = 0.15 + rs() * 0.5; b.fillStyle = rs() < 0.15 ? '#ffd9a8' : rs() < 0.3 ? '#a8d8ff' : '#ffffff'; const s = 0.4 + rs() * 0.9; b.fillRect(rs() * W, rs() * H, s, s); }
+    b.globalAlpha = 1;
+    // планета внизу справа: тело, полосы, атмосфера; кольцо (глава 1) или кратеры (глава 2, «Красная планета»)
+    const px = W * 0.92, py = H * 1.04, pr = W * 0.42, P = ch.planet;
+    if (ch.ring){ b.save(); b.translate(px, py); b.rotate(-0.3);
+      b.strokeStyle = 'rgba(180,200,255,0.18)'; b.lineWidth = 7; b.beginPath(); b.ellipse(0, 0, pr * 1.65, pr * 0.32, 0, Math.PI, Math.PI * 2); b.stroke(); b.restore(); }
+    const pg = b.createRadialGradient(px - pr * 0.4, py - pr * 0.5, pr * 0.1, px, py, pr); pg.addColorStop(0, P[0]); pg.addColorStop(1, P[1]);
+    b.fillStyle = pg; b.beginPath(); b.arc(px, py, pr, 0, 7); b.fill();
+    b.fillStyle = P[3];
+    if (ch.ring) for (let k = 0; k < 4; k++){ b.beginPath(); b.ellipse(px - pr * 0.1, py - pr * (0.75 - k * 0.18), pr * (0.7 - k * 0.05), pr * 0.04, -0.2, 0, 7); b.fill(); }
+    else { const rc = mulberry32(5); for (let k = 0; k < 9; k++){ const a = Math.PI * (1.05 + rc() * 0.6), d = pr * (0.25 + rc() * 0.65); b.beginPath(); b.arc(px + Math.cos(a) * d, py + Math.sin(a) * d, pr * (0.03 + rc() * 0.07), 0, 7); b.fill(); } }
+    b.strokeStyle = P[2]; b.lineWidth = 3; b.beginPath(); b.arc(px, py, pr, Math.PI * 1.05, Math.PI * 1.75); b.stroke();
+    if (ch.ring){ b.save(); b.translate(px, py); b.rotate(-0.3);
+      b.strokeStyle = 'rgba(200,215,255,0.35)'; b.lineWidth = 6; b.beginPath(); b.ellipse(0, 0, pr * 1.65, pr * 0.32, 0, 0, Math.PI); b.stroke();
+      b.strokeStyle = 'rgba(255,255,255,0.12)'; b.lineWidth = 2; b.beginPath(); b.ellipse(0, 0, pr * 1.5, pr * 0.27, 0, 0, Math.PI); b.stroke(); b.restore(); }
+    // луна вверху слева
+    const mx = W * 0.1, my = H * 0.13, mr = 13;
+    b.fillStyle = '#9aa3c2'; b.beginPath(); b.arc(mx, my, mr, 0, 7); b.fill();
+    b.fillStyle = '#7a83a6'; b.beginPath(); b.arc(mx + 4, my - 3, 3.2, 0, 7); b.arc(mx - 4, my + 4, 2.2, 0, 7); b.fill();
+    b.fillStyle = 'rgba(11,16,38,0.45)'; b.beginPath(); b.arc(mx + 5, my + 3, mr, 0, 7); b.fill();
+  }
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(BG.cv, 0, 0); c.restore();
+}
+// Ближние звёзды дрейфуют вниз (параллакс по глубине z), мерцают; раз в ~7 с пролетает метеор (позиция от mulberry32(номер окна)).
+function drawSky(c, now){
+  for (const st of STARS){
+    const y = (st.y * H + now * 0.006 * st.z) % H;
+    c.globalAlpha = 0.3 + 0.4 * Math.sin(now * 0.0018 + st.ph); c.fillStyle = '#ffffff'; c.fillRect(st.x * W, y, st.s, st.s);
+  }
+  c.globalAlpha = 1;
+  const slot = Math.floor(now / 7000), r = mulberry32(slot * 7919 + 1), at = slot * 7000 + r() * 4000, u = (now - at) / 650;
+  if (u > 0 && u < 1 && !RM){
+    const x0 = r() * W * 0.8 + W * 0.1, y0 = r() * H * 0.35, dx = -140 - r() * 80, dy = 70 + r() * 40;
+    const hx = x0 + dx * u, hy = y0 + dy * u, gr = c.createLinearGradient(hx, hy, hx - dx * 0.35, hy - dy * 0.35);
+    gr.addColorStop(0, 'rgba(255,255,255,' + (0.9 * (1 - u)) + ')'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    c.strokeStyle = gr; c.lineWidth = 1.6; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx - dx * 0.35, hy - dy * 0.35); c.stroke();
+  }
+}
+
+function render(){
+  const now = clock(); G.frame++;
+  ctx.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
+  drawBackdrop(ctx); drawSky(ctx, now);
+  if (!G.s) return;
+  const s = G.s, geo = geom();
+  // дедлайны: прилёт, возврат, финал, тост
+  if (G.sched.length){ const due = G.sched.filter(e => now >= e.at); G.sched = G.sched.filter(e => now < e.at); due.forEach(e => e.fn()); }
+  for (const fl of G.flights) if (!fl.arrived && now >= fl.t1) arrive(fl, now);
+  for (const fl of G.flights) if (fl.back0 && !fl.backSfx && now >= fl.back0){ fl.backSfx = true; Sfx.back(); }
+  G.flights = G.flights.filter(fl => fl.res === 'undo' ? now < fl.t1 : (!fl.arrived || (fl.back1 && now < fl.back1)));
+  G.fx = G.fx.filter(f => f.t1 > now);
+  G.parts = G.parts.filter(p => p.t1 > now);
+  // финал, который ждал возврата модуля в очередь (проигрыш на последнем промахе), — когда всё долетело
+  if (!G.ending && G.screen === 'game' && !G.flights.length && (isWin(G.s) || isLose(G.s))) afterMove(now);
+  if (G.ending && now >= G.ending.at) finishEnding(now);
+  if (toastUntil && now > toastUntil){ $('toast').classList.add('hide'); toastUntil = 0; }
+  const cp = cellXY(geo, s.core[0]);
+
+  ctx.save();
+  if (now < G.shakeUntil && !RM){ const k = (G.shakeUntil - now) / CFG.SHAKE_MS, a = Math.sin(now * 0.09) * CFG.SHAKE_PX * G.shakeAmp * k;
+    ctx.translate(Math.cos(G.shakeAng) * a, Math.sin(G.shakeAng) * a); }
+  if (G.winAt && !RM){ const z = 1 + (CFG.WIN_ZOOM - 1) * easeOut((now - G.winAt) / 900); ctx.translate(cp.x, cp.y); ctx.scale(z, z); ctx.translate(-cp.x, -cp.y); }
+  drawGridDots(ctx, geo, now);
+  drawLaneGuides(ctx, geo, s);
+  const target = pendingTargets(s, now);
+  const docksShown = s.hist.length - G.flights.filter(f => f.res === 'dock' && !f.arrived).length;   // поля считают по экрану
+  const free = (i) => s.occ[i] <= 0 || G.pending.has(i);
+  for (let i = 0; i < s.bp.length; i++){
+    if (!(s.bp[i] > 0) || !free(i)) continue;
+    const u = introU(geo, i, cp, now, 0); if (u <= 0) continue;
+    if (s.bp[i] === TRUSS){                                                            // ферма — один двойной пунктир на пару клеток
+      const j = s.grp.findIndex((g, k) => k !== i && g === s.grp[i]); if (j < i && j >= 0) continue;
+      const a = cellXY(geo, i), b = cellXY(geo, j);
+      drawTrussBlueprint(ctx, a, b, geo.cell * u, now, target.has(i) || target.has(j));
+    } else { const p = cellXY(geo, i); drawBlueprintCell(ctx, p.x, p.y, geo.cell * u, s.bp[i], now, target.has(i)); }
+  }
+  for (const i of s.debris){ const p = cellXY(geo, i), u = introU(geo, i, cp, now, 60); if (u > 0) drawDebris(ctx, p.x, p.y, geo.cell * u, i, now); }
+  for (const i of s.mirrors){ const p = cellXY(geo, i), u = introU(geo, i, cp, now, 60); if (u > 0) drawMirror(ctx, p.x, p.y, geo.cell * u, s.base[i], now, G.mirrorHit[i]); }
+  for (const i of s.gates) if (s.occ[i] === GATE || G.pending.has(i)){ const p = cellXY(geo, i), u = introU(geo, i, cp, now, 60);
+    if (u > 0) drawGate(ctx, p.x, p.y, geo.cell * u, s.gate[i] - docksShown, now, !!s.bp[i]); }
+  drawStation(ctx, geo, s, now, cp);
+  ctx.restore();
+
+  drawQueues(ctx, geo, s, now);
+  if (G.press && G.press.li >= 0 && G.screen === 'game' && !G.ending) drawPreview(ctx, geo, s, G.press.li, now);
+  for (const fl of G.flights) drawFlight(ctx, geo, fl, now);
+  drawParts(ctx, now);
+  for (const f of G.fx) drawFx(ctx, f, now, geo);
+  drawHint(ctx, geo, s, now);
+  if (G.introAt && now > G.introAt + CFG.INTRO_MS + 400){ G.introAt = 0; log('fx.end', 'intro'); }
+}
+// Появление уровня: клетка чертежа «выпрыгивает» с задержкой по расстоянию от ядра.
+function introU(geo, i, cp, now, extra){
+  if (!G.introAt) return 1;
+  const p = cellXY(geo, i), d = Math.hypot(p.x - cp.x, p.y - cp.y) / geo.cell;
+  return easeOutBack((now - G.introAt - 80 - extra - d * 60) / 280);
+}
+// Клетки, к которым летит модуль или нацелен палец: их пунктир подсвечивается заранее.
+function pendingTargets(s, now){
+  const t = new Set(); for (const fl of G.flights) if (fl.res === 'dock' && !fl.arrived) fl.cells.forEach(c => t.add(c));
+  if (G.press && G.press.li >= 0){ const L = landing(s, G.press.li); if (L && L.res === 'dock') L.cells.forEach(c => t.add(c)); }
+  return t;
+}
+// Точки в центрах клеток: по ним читаются линии полёта.
+function drawGridDots(c, geo){
+  c.fillStyle = 'rgba(160,180,255,0.16)';
+  for (let y = 0; y < geo.gh; y++) for (let x = 0; x < geo.gw; x++){ c.beginPath(); c.arc(geo.ox + (x + 0.5) * geo.cell, geo.oy + (y + 0.5) * geo.cell, geo.cell * 0.035, 0, 7); c.fill(); }
+}
+// Полоса линии у каждой живой очереди; линия под пальцем — ярче.
+function drawLaneGuides(c, geo, s){
+  s.lanes.forEach((ln, li) => {
+    if (s.ptr[li] >= ln.q.length) return;
+    const on = G.press && G.press.li === li;
+    c.fillStyle = on ? 'rgba(140,200,255,0.12)' : 'rgba(120,150,255,0.045)';
+    if (ln.side === 'L' || ln.side === 'R') c.fillRect(geo.ox, geo.oy + ln.idx * geo.cell + geo.cell * 0.22, geo.gw * geo.cell, geo.cell * 0.56);
+    else c.fillRect(geo.ox + ln.idx * geo.cell + geo.cell * 0.22, geo.oy, geo.cell * 0.56, geo.gh * geo.cell);
+  });
+}
+// Пунктир чертежа — голограмма: заливка, бегущий штрих, значок типа; hot — сюда летит модуль или смотрит прицел.
+function drawBlueprintCell(c, x, y, size, kind, now, hot){
+  const w = size * 0.8, col = kind === SOLAR ? css('--solar') : css('--bp'), pulse = 0.5 + 0.5 * Math.sin(now * 0.004 + x * 0.05 + y * 0.03);
+  if (hot) drawGlow(c, x, y, size * 0.9, col, 0.35 + 0.2 * pulse);
+  c.save();
+  c.fillStyle = col; c.globalAlpha = hot ? 0.24 : 0.06 + 0.04 * pulse; c.beginPath(); c.roundRect(x - w / 2, y - w / 2, w, w, size * 0.16); c.fill();
+  c.globalAlpha = hot ? 1 : 0.85; c.strokeStyle = col; c.lineWidth = Math.max(1.5, size * 0.055); c.setLineDash([size * 0.13, size * 0.09]);
+  c.lineDashOffset = -now * 0.012; c.stroke();
+  c.setLineDash([]); c.globalAlpha = hot ? 0.8 : 0.4; c.lineWidth = Math.max(1, size * 0.04);
+  if (kind === SOLAR){ c.strokeRect(x - w * 0.27, y - w * 0.27, w * 0.54, w * 0.54); c.beginPath(); c.moveTo(x, y - w * 0.27); c.lineTo(x, y + w * 0.27); c.moveTo(x - w * 0.27, y); c.lineTo(x + w * 0.27, y); c.stroke(); }
+  else { c.beginPath(); c.arc(x, y - size * 0.04, w * 0.2, 0, 7); c.stroke(); }
+  c.restore();
+}
+// Обломок: неровный многоугольник из 8 вершин с контуром и кратерами, медленно вращается; форма от номера клетки.
+function drawDebris(c, x, y, size, seed, now){
+  const R = size * 0.42, rot = now * 0.00025 + seed, lw = Math.max(1.5, size * 0.06), r = mulberry32(seed * 7 + 3), pts = [];
+  for (let k = 0; k < 8; k++){ const a = rot + k / 8 * 6.283, rr = R * (0.72 + r() * 0.28); pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]); }
+  c.fillStyle = css('--debris'); c.strokeStyle = '#2a2436'; c.lineWidth = lw; c.lineJoin = 'round';
+  c.beginPath(); pts.forEach(p => c.lineTo(p[0], p[1])); c.closePath(); c.fill();
+  c.save(); c.clip(); c.fillStyle = css('--debris-edge'); c.beginPath(); c.arc(x + R * 0.35, y + R * 0.35, R * 0.9, 0, 7); c.fill(); c.restore();
+  c.beginPath(); pts.forEach(p => c.lineTo(p[0], p[1])); c.closePath(); c.stroke();
+  c.fillStyle = '#2f2a3d'; const ca = rot * 1.0;
+  c.beginPath(); c.arc(x + Math.cos(ca) * R * 0.3, y + Math.sin(ca) * R * 0.3, R * 0.17, 0, 7); c.arc(x + Math.cos(ca + 2.4) * R * 0.38, y + Math.sin(ca + 2.4) * R * 0.38, R * 0.11, 0, 7); c.fill();
+}
+// Станция: переходные шлюзы между соседними клетками, ореол и ядро, модули; огни после победы волной от ядра;
+// после проигрыша — мигание красным и гаснущие окна.
+function drawStation(c, geo, s, now, cp){
+  const gw = geo.gw, cell = geo.cell, on = (i) => (s.occ[i] === CORE || s.occ[i] > 0) && !G.pending.has(i);
+  const coreU = G.introAt ? easeOutBack((now - G.introAt) / 320) : 1;
+  drawGlow(c, cp.x, cp.y, cell * (1.7 + 0.15 * Math.sin(now * 0.003)) * coreU, css('--core'), G.winAt ? 0.9 : 0.45);
+  const sameTruss = (a, b) => s.occ[a] === TRUSS && s.occ[b] === TRUSS && s.grp[a] > 0 && s.grp[a] === s.grp[b];
+  for (let i = 0; i < s.occ.length; i++){
+    if (!on(i)) continue; const x = i % gw;
+    if (x + 1 < gw && on(i + 1) && !sameTruss(i, i + 1)) drawTunnel(c, geo, i, i + 1, now);
+    if (i + gw < s.occ.length && on(i + gw) && !sameTruss(i, i + gw)) drawTunnel(c, geo, i, i + gw, now);
+  }
+  const lastCells = s.dead && !G.ending && s.hist.length ? s.hist[s.hist.length - 1].cells : [];
+  const blackout = G.loseAt ? ease((now - G.loseAt) / 900) : 0;
+  const look = (i, p) => {
+    let lit = 0, glint = 0;
+    if (G.winAt){ const d = Math.hypot(p.x - cp.x, p.y - cp.y) / cell; lit = ease((now - G.winAt - d * 110) / 220); glint = ease((now - G.winAt - 300 - d * 90) / 500); }
+    const fx = G.cellFx[i]; let sx = 1, sy = 1, ang = 0;
+    if (fx){ const b = bump((now - fx.t0) / CFG.SQUASH_MS); sx = 1 - 0.2 * b; sy = 1 + 0.14 * b; ang = fx.ang; }
+    let tint = null;
+    if (lastCells.includes(i)) tint = 'rgba(255,90,106,' + (0.55 + 0.45 * Math.sin(now * 0.012)) + ')';
+    if (blackout && Math.sin(now * 0.05 + i) > 0.2 && blackout < 0.9) tint = css('--bad');
+    return { lit: lit * (1 - blackout), glint, sx, sy, tint, ang };
+  };
+  for (let i = 0; i < s.occ.length; i++){
+    if (!on(i)) continue; const p = cellXY(geo, i);
+    if (s.occ[i] === CORE){ drawCore(c, p.x, p.y, cell * coreU, now, blackout); continue; }
+    if (s.occ[i] === TRUSS){                                                        // ферма рисуется один раз на пару
+      const j = s.grp.findIndex((g, k) => k !== i && g === s.grp[i] && s.occ[k] === TRUSS); if (j < 0 || j < i || !on(j)) continue;
+      const q = cellXY(geo, j), m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }, o = look(i, m), horiz = Math.abs(p.y - q.y) < 1;
+      drawTruss(c, m.x, m.y, cell * 0.8, horiz ? 0 : Math.PI / 2, Object.assign(o, { unrot: false, sxAng: o.ang }));
+      continue;
+    }
+    const o = look(i, p);
+    drawModule(c, p.x, p.y, cell * 0.8, s.occ[i], o.ang, Object.assign(o, { unrot: true }));
+    if (o.lit > 0) drawGlow(c, p.x, p.y - cell * 0.05, cell * 0.7, css('--lamp'), 0.5 * o.lit * (0.8 + 0.2 * Math.sin(now * 0.006 + i)));
+  }
+}
+// Модуль любого типа: ферма — drawTruss, остальные — drawModule (те же опции).
+function drawPiece(c, x, y, size, kind, ang, o){ if (kind === TRUSS) drawTruss(c, x, y, size, ang, o || {}); else drawModule(c, x, y, size, kind, ang, o); }
+// Ферма: длинная решётчатая балка на 2 клетки (длина size × TRUSS_VL) — две рейки, раскосы зигзагом, оранжевые торцевые узлы.
+// ang — вдоль чего лежит; o.queued/o.flame — сопло и пламя сзади (как у модуля); o.lit — огни по рейкам; o.tint — обводка.
+function drawTruss(c, x, y, size, ang, o){
+  o = o || {};
+  const L = size * CFG.TRUSS_VL, h = L / 2, t = size * 0.34, lw = Math.max(1.2, size * 0.07), ink = '#3a4468';
+  c.save(); c.translate(x, y); c.rotate(ang);
+  if (o.sx || o.sy){ c.rotate((o.sxAng || 0) - ang); c.scale(o.sx || 1, o.sy || 1); c.rotate(ang - (o.sxAng || 0)); }
+  if (o.alpha !== undefined) c.globalAlpha = o.alpha;
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  if (o.queued || o.flame){
+    const fl = o.flame || 0;
+    if (fl > 0 && !o.flameFront){ const FL = size * (0.3 + 0.75 * fl) * (0.85 + 0.15 * Math.sin(performance.now() * 0.06));
+      drawGlow(c, -h - size * 0.2, 0, size * 0.7 * fl, '#ff9a3c', 0.8);
+      c.fillStyle = '#ff7a2c'; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.2); c.quadraticCurveTo(-h - FL * 0.6, 0, -h - FL, 0); c.quadraticCurveTo(-h - FL * 0.6, 0, -h - size * 0.14, size * 0.2); c.fill();
+      c.fillStyle = '#ffd35a'; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.1); c.lineTo(-h - FL * 0.6, 0); c.lineTo(-h - size * 0.14, size * 0.1); c.fill(); }
+    if (fl > 0 && o.flameFront){ c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(h + size * 0.05, -size * 0.12); c.lineTo(h + size * 0.45 * fl, 0); c.lineTo(h + size * 0.05, size * 0.12); c.fill(); }
+    c.fillStyle = '#7d88a8'; c.strokeStyle = ink; c.lineWidth = lw * 0.8;
+    c.beginPath(); c.moveTo(-h + 1, -size * 0.18); c.lineTo(-h - size * 0.15, -size * 0.25); c.lineTo(-h - size * 0.15, size * 0.25); c.lineTo(-h + 1, size * 0.18); c.closePath(); c.fill(); c.stroke();
+  }
+  // рейки и раскосы
+  c.strokeStyle = ink; c.lineWidth = lw * 2.4;
+  c.beginPath(); c.moveTo(-h + size * 0.2, -t); c.lineTo(h - size * 0.2, -t); c.moveTo(-h + size * 0.2, t); c.lineTo(h - size * 0.2, t); c.stroke();
+  const n = 5, zig = []; for (let k = 0; k <= n; k++) zig.push([-h + size * 0.25 + (L - size * 0.5) * k / n, k % 2 ? t : -t]);
+  c.beginPath(); zig.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
+  c.strokeStyle = '#c3cce2'; c.lineWidth = lw * 1.2;
+  c.beginPath(); c.moveTo(-h + size * 0.2, -t); c.lineTo(h - size * 0.2, -t); c.moveTo(-h + size * 0.2, t); c.lineTo(h - size * 0.2, t); c.stroke();
+  c.beginPath(); zig.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
+  // торцевые узлы
+  for (const ex of [-h + size * 0.2, h - size * 0.2]){
+    c.fillStyle = css('--truss'); c.strokeStyle = ink; c.lineWidth = lw;
+    c.beginPath(); c.roundRect(ex - size * 0.2, -size * 0.42, size * 0.4, size * 0.84, size * 0.12); c.fill(); c.stroke();
+    c.fillStyle = o.lit ? css('--lamp') : '#ffd9a8'; c.beginPath(); c.arc(ex, 0, size * 0.09, 0, 7); c.fill();
+    if (o.lit) drawGlow(c, ex, 0, size * 0.45, css('--lamp'), 0.7 * o.lit);
+  }
+  if (o.queued){
+    c.fillStyle = '#e8eeff'; c.strokeStyle = ink; c.lineWidth = lw * 0.7;
+    c.beginPath(); c.moveTo(h + size * 0.08, -size * 0.13); c.lineTo(h + size * 0.24, 0); c.lineTo(h + size * 0.08, size * 0.13); c.closePath(); c.fill(); c.stroke();
+  }
+  if (o.tint){ c.strokeStyle = o.tint; c.lineWidth = Math.max(2.5, size * 0.1); c.beginPath(); c.roundRect(-h - 3, -size * 0.5 - 3, L + 6, size + 6, size * 0.25); c.stroke(); }
+  c.restore();
+}
+// Двойной пунктир фермы: капсула на две клетки a–b, бегущий штрих, значок-раскос; hot — сюда летят или целятся.
+function drawTrussBlueprint(c, a, b, size, now, hot){
+  const col = css('--truss'), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, horiz = Math.abs(a.y - b.y) < 1, L = size * 1.8, T = size * 0.8;
+  const w = horiz ? L : T, hh = horiz ? T : L, pulse = 0.5 + 0.5 * Math.sin(now * 0.004 + mx * 0.05);
+  if (hot) drawGlow(c, mx, my, size * 1.3, col, 0.35 + 0.2 * pulse);
+  c.save(); c.fillStyle = col; c.globalAlpha = hot ? 0.24 : 0.06 + 0.04 * pulse;
+  c.beginPath(); c.roundRect(mx - w / 2, my - hh / 2, w, hh, size * 0.18); c.fill();
+  c.globalAlpha = hot ? 1 : 0.85; c.strokeStyle = col; c.lineWidth = Math.max(1.5, size * 0.055); c.setLineDash([size * 0.13, size * 0.09]); c.lineDashOffset = -now * 0.012; c.stroke();
+  c.setLineDash([]); c.globalAlpha = hot ? 0.8 : 0.45; c.lineWidth = Math.max(1, size * 0.045);
+  c.translate(mx, my); if (!horiz) c.rotate(Math.PI / 2);
+  c.beginPath(); for (let k = 0; k <= 4; k++){ const x = -size * 0.6 + size * 1.2 * k / 4, y = k % 2 ? size * 0.16 : -size * 0.16; k ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke();
+  c.restore();
+}
+// Отражатель: тёмная круглая площадка и зеркальная планка по диагонали ('/' или '\\'); вспыхивает, когда сквозь него прошёл модуль.
+function drawMirror(c, x, y, size, type, now, hitAt){
+  const r = size * 0.42, flash = hitAt ? 1 - ease((now - hitAt) / 350) : 0, lw = Math.max(1.5, size * 0.06);
+  if (flash > 0) drawGlow(c, x, y, size * 0.9, css('--mirror'), flash);
+  c.save(); c.translate(x, y); c.rotate(type === MIRROR_A ? -Math.PI / 4 : Math.PI / 4);
+  c.fillStyle = '#1a2150'; c.strokeStyle = '#3a4685'; c.lineWidth = lw; c.beginPath(); c.arc(0, 0, r, 0, 7); c.fill(); c.stroke();
+  c.fillStyle = '#2b3566'; for (const a of [0.8, 2.35, 3.95, 5.5]){ c.beginPath(); c.arc(Math.cos(a) * r * 0.72, Math.sin(a) * r * 0.72, size * 0.035, 0, 7); c.fill(); }
+  const L = size * 0.46, T = size * 0.11;
+  c.fillStyle = '#0b1026'; c.beginPath(); c.roundRect(-L - 2, -T - 2, L * 2 + 4, T * 2 + 4, T); c.fill();
+  const gr = c.createLinearGradient(0, -T, 0, T); gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, css('--mirror')); gr.addColorStop(1, '#5aa8d8');
+  c.fillStyle = gr; c.beginPath(); c.roundRect(-L, -T, L * 2, T * 2, T * 0.8); c.fill();
+  const sh = ((now * 0.0006 + x * 0.01) % 1) * 2 - 1;                                  // бегущий блик по планке
+  c.fillStyle = 'rgba(255,255,255,0.8)'; c.beginPath(); c.roundRect(sh * L - size * 0.05, -T * 0.7, size * 0.1, T * 1.4, 2); c.fill();
+  c.restore();
+}
+// Силовое поле: два излучателя по бокам клетки и мерцающая сетка между ними; в центре — сколько стыковок осталось.
+// over — под полем клетка чертежа (видна сквозь поле); left ≤ 0 — поле снято: остаются тусклые излучатели.
+function drawGate(c, x, y, size, left, now, over){
+  const col = css('--gate'), w = size * 0.86, h2 = w / 2, lw = Math.max(1.5, size * 0.06), open = left <= 0;
+  c.save(); c.lineJoin = 'round';
+  if (!open){
+    drawGlow(c, x, y, size * 0.8, col, 0.35 + 0.1 * Math.sin(now * 0.008));
+    c.fillStyle = col; c.globalAlpha = over ? 0.22 : 0.32; c.fillRect(x - h2 + size * 0.1, y - h2, w - size * 0.2, w);
+    c.globalAlpha = 0.75; c.strokeStyle = '#f0dcff'; c.lineWidth = Math.max(1, size * 0.03);
+    for (let k = 0; k < 4; k++){ const yy = y - h2 + ((k / 4 + now * 0.0006) % 1) * w; c.beginPath(); c.moveTo(x - h2 + size * 0.12, yy);
+      for (let s = 1; s <= 6; s++) c.lineTo(x - h2 + size * 0.12 + (w - size * 0.24) * s / 6, yy + Math.sin(now * 0.03 + s * 2 + k) * size * 0.03); c.stroke(); }
+    c.globalAlpha = 1;
+  }
+  for (const sx of [-1, 1]){                                                         // излучатели
+    c.fillStyle = open ? '#3a4466' : '#5b3f8a'; c.strokeStyle = '#1e1640'; c.lineWidth = lw;
+    c.beginPath(); c.roundRect(x + sx * h2 - size * 0.08, y - h2, size * 0.16, w, size * 0.06); c.fill(); c.stroke();
+    c.fillStyle = open ? '#59607e' : col; c.beginPath(); c.arc(x + sx * h2, y - h2 + size * 0.14, size * 0.05, 0, 7); c.arc(x + sx * h2, y + h2 - size * 0.14, size * 0.05, 0, 7); c.fill();
+  }
+  if (!open){
+    c.fillStyle = '#1e1640'; c.strokeStyle = col; c.lineWidth = lw; c.beginPath(); c.arc(x, y, size * 0.22, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = '#ffffff'; c.font = '800 ' + (size * 0.3).toFixed(1) + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(left), x, y + size * 0.01);
+  }
+  c.restore();
+}
+// Шлюз между двумя клетками станции: трубка с ободом посередине; после стыковки обод вспыхивает и защёлкивается.
+function drawTunnel(c, geo, a, b, now){
+  const pa = cellXY(geo, a), pb = cellXY(geo, b), horiz = Math.abs(pa.y - pb.y) < 1, cell = geo.cell, t = cell * 0.3, lw = Math.max(1.2, cell * 0.05);
+  const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
+  c.fillStyle = '#8f9bbb'; c.strokeStyle = '#3a4468'; c.lineWidth = lw;
+  c.beginPath(); if (horiz) c.rect(pa.x, my - t / 2, pb.x - pa.x, t); else c.rect(mx - t / 2, pa.y, t, pb.y - pa.y); c.fill(); c.stroke();
+  const fa = G.cellFx[a], fb = G.cellFx[b], f = fa && fb ? (fa.t0 > fb.t0 ? fa : fb) : fa || fb;
+  const u = f ? (now - f.t0) / CFG.LATCH_MS : 1, flash = f && u < 1 ? 1 - u : 0, close = f ? easeOutBack(u) : 1;
+  const cw = cell * 0.14, ch = t * (1.15 + 0.5 * (1 - close));
+  c.fillStyle = flash ? css('--lamp') : '#c3cce2';
+  c.beginPath(); if (horiz) c.roundRect(mx - cw / 2, my - ch / 2, cw, ch, 2); else c.roundRect(mx - ch / 2, my - cw / 2, ch, cw, 2); c.fill(); c.stroke();
+  if (flash) drawGlow(c, mx, my, cell * 0.6, css('--lamp'), flash * 0.8);
+}
+// Ядро станции: шестигранник с контуром, вращающееся кольцо из трёх дуг, маячки по вершинам по очереди.
+function drawCore(c, x, y, size, now, blackout){
+  if (size <= 0) return;
+  const R = size * 0.52, hex = (r) => { c.beginPath(); for (let k = 0; k < 6; k++){ const a = k / 6 * 6.283 + Math.PI / 6; c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } c.closePath(); };
+  c.lineJoin = 'round'; c.lineWidth = Math.max(1.5, size * 0.07); c.strokeStyle = '#1e2a66';
+  hex(R); c.fillStyle = css('--core-edge'); c.fill(); c.stroke();
+  hex(R * 0.78); c.fillStyle = css('--core'); c.fill();
+  c.save(); hex(R * 0.78); c.clip(); c.fillStyle = 'rgba(255,255,255,0.18)'; c.beginPath(); c.arc(x - R * 0.4, y - R * 0.5, R * 0.7, 0, 7); c.fill(); c.restore();
+  const rot = now * 0.0016;
+  c.strokeStyle = blackout ? css('--bad') : '#ffffff'; c.lineWidth = size * 0.07; c.lineCap = 'round';
+  for (let k = 0; k < 3; k++){ c.beginPath(); c.arc(x, y, R * 0.42, rot + k * 2.094, rot + k * 2.094 + 1.4); c.stroke(); }
+  c.fillStyle = '#e8f0ff'; c.beginPath(); c.arc(x, y, R * 0.16, 0, 7); c.fill();
+  for (let k = 0; k < 6; k += 2){
+    const a = k / 6 * 6.283 + Math.PI / 6, on = Math.floor(now / 380) % 3 === k / 2;
+    const col = blackout ? css('--bad') : G.winAt ? css('--lamp') : css('--ok');
+    c.fillStyle = on || G.winAt ? col : '#2b3566'; c.beginPath(); c.arc(x + Math.cos(a) * R * 0.92, y + Math.sin(a) * R * 0.92, size * 0.065, 0, 7); c.fill();
+    if (on || G.winAt) drawGlow(c, x + Math.cos(a) * R * 0.92, y + Math.sin(a) * R * 0.92, size * 0.25, col, 0.7);
+  }
+}
+// Модуль. kind — тип (жилой: белый корпус с иллюминатором; панель: синие ячейки в золотой раме), ang — куда смотрит нос.
+// o.queued — в очереди: сопло сзади, огонёк дежурного пламени и стрелка носа; o.flame — пламя полёта 0..1 (o.flameFront — обратная тяга);
+// o.lit — огни победы 0..1; o.glint — блик по панели 0..1; o.sx/o.sy — сплющивание (вдоль/поперёк носа); o.alpha; o.tint — обводка;
+// o.unrot — корпус не поворачивать (пристыкованный модуль стоит ровно, сплющивание всё равно по направлению удара).
+function drawModule(c, x, y, size, kind, ang, o){
+  o = o || {};
+  const h = size / 2, solar = kind === SOLAR, lw = Math.max(1.2, size * 0.07), ink = '#3a4468';
+  c.save(); c.translate(x, y); c.rotate(ang); c.scale(o.sx || 1, o.sy || 1); if (o.unrot) c.rotate(-ang);
+  if (o.alpha !== undefined) c.globalAlpha = o.alpha;
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  if ((o.queued || o.flame) && !o.unrot){
+    const fl = o.flame || 0, t = performance.now();
+    if (fl > 0 && !o.flameFront){
+      const L = size * (0.3 + 0.75 * fl) * (0.85 + 0.15 * Math.sin(t * 0.06));
+      drawGlow(c, -h - size * 0.2, 0, size * 0.7 * fl, '#ff9a3c', 0.8);
+      c.fillStyle = '#ff7a2c'; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.2); c.quadraticCurveTo(-h - L * 0.6, -size * 0.12, -h - L, 0); c.quadraticCurveTo(-h - L * 0.6, size * 0.12, -h - size * 0.14, size * 0.2); c.fill();
+      c.fillStyle = '#ffd35a'; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.12); c.quadraticCurveTo(-h - L * 0.4, -size * 0.06, -h - L * 0.65, 0); c.quadraticCurveTo(-h - L * 0.4, size * 0.06, -h - size * 0.14, size * 0.12); c.fill();
+      c.fillStyle = '#fffbe8'; c.beginPath(); c.ellipse(-h - size * 0.2, 0, L * 0.16, size * 0.05, 0, 0, 7); c.fill();
+    } else if (o.queued){
+      const pl = size * (0.1 + 0.04 * Math.sin(t * 0.03 + x));                     // дежурное пламя
+      c.fillStyle = '#7fd6ff'; c.globalAlpha *= 0.8; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.08); c.lineTo(-h - size * 0.14 - pl, 0); c.lineTo(-h - size * 0.14, size * 0.08); c.fill(); c.globalAlpha /= 0.8;
+    }
+    if (fl > 0 && o.flameFront){                                                   // обратная тяга носом
+      const L = size * 0.45 * fl;
+      c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(h + size * 0.05, -size * 0.12); c.lineTo(h + L, 0); c.lineTo(h + size * 0.05, size * 0.12); c.fill();
+    }
+    c.fillStyle = '#7d88a8'; c.strokeStyle = ink; c.lineWidth = lw * 0.8;          // сопло-колокол
+    c.beginPath(); c.moveTo(-h + 1, -size * 0.18); c.lineTo(-h - size * 0.15, -size * 0.25); c.lineTo(-h - size * 0.15, size * 0.25); c.lineTo(-h + 1, size * 0.18); c.closePath(); c.fill(); c.stroke();
+  }
+  const r = size * 0.22;
+  if (solar){
+    c.fillStyle = css('--solar'); c.strokeStyle = '#7a5200'; c.lineWidth = lw;
+    c.beginPath(); c.roundRect(-h, -h, size, size, r); c.fill();
+    const m = size * 0.13, g = size * 0.06, cw = (size - 2 * m - g) / 2;
+    for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++){
+      const cx = -h + m + a * (cw + g), cy = -h + m + b * (cw + g);
+      c.fillStyle = '#2f55c8'; c.beginPath(); c.roundRect(cx, cy, cw, cw, size * 0.04); c.fill();
+      c.fillStyle = '#5a85f2'; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + cw * 0.6, cy); c.lineTo(cx, cy + cw * 0.6); c.closePath(); c.fill();
+    }
+    if (o.glint > 0 && o.glint < 1){
+      c.save(); c.beginPath(); c.roundRect(-h, -h, size, size, r); c.clip();
+      const gx = -h * 2 + o.glint * size * 2.2; c.fillStyle = 'rgba(255,255,255,0.7)';
+      c.beginPath(); c.moveTo(gx, -h); c.lineTo(gx + size * 0.22, -h); c.lineTo(gx - size * 0.3, h); c.lineTo(gx - size * 0.52, h); c.closePath(); c.fill(); c.restore();
+    }
+    c.strokeStyle = '#7a5200'; c.beginPath(); c.roundRect(-h, -h, size, size, r); c.stroke();
+  } else {
+    c.fillStyle = css('--hull'); c.beginPath(); c.roundRect(-h, -h, size, size, r); c.fill();
+    c.save(); c.clip(); c.fillStyle = '#cdd5e6'; c.fillRect(-h, h * 0.32, size, h); c.restore();          // плоская тень снизу
+    c.strokeStyle = 'rgba(58,68,104,0.35)'; c.lineWidth = lw * 0.6; c.beginPath(); c.moveTo(-h + size * 0.12, h * 0.32); c.lineTo(h - size * 0.12, h * 0.32); c.stroke();
+    c.fillStyle = '#8f9bbb'; c.beginPath(); c.arc(-h + size * 0.16, h - size * 0.16, size * 0.035, 0, 7); c.arc(h - size * 0.16, h - size * 0.16, size * 0.035, 0, 7); c.fill();
+    const wy = -size * 0.07, wr = size * 0.21;
+    c.fillStyle = '#2b3566'; c.strokeStyle = ink; c.lineWidth = lw * 0.8; c.beginPath(); c.arc(0, wy, wr, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = o.lit ? css('--lamp') : '#4fb8e8'; c.beginPath(); c.arc(0, wy, wr * 0.7, 0, 7); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.85)'; c.beginPath(); c.arc(-wr * 0.28, wy - wr * 0.28, wr * 0.22, 0, 7); c.fill();
+    c.strokeStyle = ink; c.lineWidth = lw; c.beginPath(); c.roundRect(-h, -h, size, size, r); c.stroke();
+  }
+  if (o.queued && !o.unrot){                                                      // стрелка носа: куда полетит
+    c.fillStyle = '#e8eeff'; c.strokeStyle = ink; c.lineWidth = lw * 0.7;
+    c.beginPath(); c.moveTo(h + size * 0.08, -size * 0.13); c.lineTo(h + size * 0.24, 0); c.lineTo(h + size * 0.08, size * 0.13); c.closePath(); c.fill(); c.stroke();
+  }
+  if (o.tint){ c.strokeStyle = o.tint; c.lineWidth = Math.max(2.5, size * 0.1); c.beginPath(); c.roundRect(-h - 3, -h - 3, size + 6, size + 6, r * 1.2); c.stroke(); }
+  c.restore();
+}
+// Направляющая очереди: рейка от кромки поля наружу с захватом у переднего места и мигающим огоньком на конце.
+function drawRail(c, geo, ln, li, out, now, alive){
+  const o = qOffsets(ln, 0), far = o.length ? o[o.length - 1].far : 1, a = slotAt(geo, ln, 0.15 + out), b = slotAt(geo, ln, Math.max(far, 1) + out);
+  const t = geo.cell * 0.16;
+  c.save(); c.globalAlpha = alive ? 1 : G.winAt ? Math.max(0, 0.2 - (now - G.winAt) / 1500) : 0.2;
+  c.strokeStyle = '#1a2150'; c.lineWidth = t + 3; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+  c.strokeStyle = '#3a4685'; c.lineWidth = t; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+  if (alive){ const on = 0.5 + 0.5 * Math.sin(now * 0.004 + li * 1.7); c.fillStyle = css('--ok'); c.globalAlpha = 0.4 + 0.6 * on; c.beginPath(); c.arc(b.x, b.y, geo.cell * 0.05, 0, 7); c.fill(); }
+  c.restore();
+}
+// Очереди у краёв: передний крупно у кромки поля, следующие мельче дальше; покачиваются; при подтягивании — сдвиг SLIDE_MS;
+// на появлении уровня подъезжают из-за края по очереди.
+function drawQueues(c, geo, s, now){
+  s.lanes.forEach((ln, li) => {
+    const out = G.introAt ? (1 - easeOut((now - G.introAt - 200 - li * 45) / 420)) * 3 : 0;
+    const alive = s.ptr[li] < ln.q.length;
+    drawRail(c, geo, ln, li, out, now, alive);
+    if (!alive) return;
+    const busy = (G.laneBusy[li] || 0) > now, hideFront = busy && G.flights.some(f => f.li === li && f.res !== 'dock');
+    const slideU = G.laneSlide[li] && s.ptr[li] > 0 ? easeOutBack((now - G.laneSlide[li]) / CFG.SLIDE_MS) : 1;
+    const cur = qOffsets(ln, s.ptr[li]), prev = slideU < 1 ? qOffsets(ln, s.ptr[li] - 1).slice(1) : cur;   // сдвиг: из прежней раскладки в новую
+    const ang = angOf(ln.side), perp = [-Math.sin(ang), Math.cos(ang)];
+    for (let j = cur.length - 1; j >= 0; j--){
+      if (j === 0 && hideFront) continue;
+      const a = cur[j], b = prev[j] || a, off = b.off + (a.off - b.off) * slideU + out, sc = b.sc + (a.sc - b.sc) * ease(slideU);
+      const p = slotAt(geo, ln, off), bob = RM ? 0 : Math.sin(now * 0.0022 + li * 1.3 + j * 0.8) * geo.cell * 0.03;
+      const pressed = G.press && G.press.li === li && j === 0, pu = pressed ? easeOut((now - G.press.since) / 90) : 0;
+      drawPiece(c, p.x + perp[0] * bob, p.y + perp[1] * bob, geo.cell * sc, ln.q[a.k], ang,
+        { queued: true, sx: 1 - (1 - CFG.PRESS_SCALE) * pu, sy: 1 + 0.04 * pu, flame: pressed ? 0.25 + 0.1 * Math.sin(now * 0.04) : 0 });
+    }
+  });
+}
+// Превью: честный расчёт landing() того же ядра — бегущие точки до цели, уголки прицела и призрак там, где модуль встанет.
+function drawPreview(c, geo, s, li, now){
+  const L = landing(s, li); if (!L) return;
+  const fr = frontOf(geo, s, li), ok = L.res === 'dock', col = ok ? css('--ok') : css('--bad');
+  const fp = flightPath(geo, L, fr.p);
+  if (L.res === 'off'){ const q = farXY(geo, s.lanes[li], L), lastPrev = fp.pts[fp.pts.length - 2]; fp.pts[fp.pts.length - 1] = q;
+    fp.lens[fp.lens.length - 1] = fp.lens[fp.lens.length - 2] + Math.hypot(q.x - lastPrev.x, q.y - lastPrev.y); fp.total = fp.lens[fp.lens.length - 1]; }
+  const step = geo.cell * 0.3, end = fp.total - geo.cell * 0.3;
+  c.fillStyle = col;
+  for (let d = geo.cell * 0.6 + ((now * 0.09) % step); d < end; d += step){
+    const q = pathAt(fp, d / fp.total); c.globalAlpha = 0.35 + 0.6 * (d / fp.total); c.beginPath(); c.arc(q.x, q.y, geo.cell * 0.05, 0, 7); c.fill();
+  }
+  c.globalAlpha = 1;
+  const k = 1 + 0.4 * (1 - easeOut((now - G.press.since) / 160)), to = fp.pts[fp.pts.length - 1];
+  if (L.res === 'dock' || L.res === 'crooked'){
+    const truss = MOD_LEN[L.kind] > 1, ang = truss ? Math.atan2(L.dir[1], L.dir[0]) : 0;
+    drawPiece(c, to.x, to.y, geo.cell * 0.8, L.kind, ang, { alpha: 0.42 + 0.1 * Math.sin(now * 0.01), unrot: true });
+    if (truss){ c.save(); c.translate(to.x, to.y); c.rotate(ang); drawBrackets(c, 0, 0, geo.cell * 0.52 * k, col, 1.75); c.restore(); }
+    else drawBrackets(c, to.x, to.y, geo.cell * 0.52 * k, col);
+    if (ok) drawGlow(c, to.x, to.y, geo.cell * (truss ? 1.3 : 0.9), col, 0.25);
+  }
+  if (!ok) drawCross(c, to.x, to.y, geo.cell * 0.2 * k, col);
+}
+// Уголки прицела вокруг клетки (полуразмер r).
+function drawBrackets(c, x, y, r, col, stretch){
+  const rx = r * (stretch || 1), ry = r, l = r * 0.42;            // stretch — вытянуть вдоль (ферма)
+  c.save(); c.strokeStyle = col; c.lineWidth = Math.max(2, r * 0.13); c.lineCap = 'round'; c.beginPath();
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]){ c.moveTo(x + sx * rx, y + sy * (ry - l)); c.lineTo(x + sx * rx, y + sy * ry); c.lineTo(x + sx * (rx - l), y + sy * ry); }
+  c.stroke(); c.restore();
+}
+function drawCross(c, x, y, r, col){ c.save(); c.strokeStyle = '#1a1030'; c.lineWidth = r * 0.75; c.lineCap = 'round'; c.beginPath(); c.moveTo(x - r, y - r); c.lineTo(x + r, y + r); c.moveTo(x + r, y - r); c.lineTo(x - r, y + r); c.stroke();
+  c.strokeStyle = col; c.lineWidth = r * 0.45; c.stroke(); c.restore(); }
+// Летящий модуль: разгон (квадратичная доля пути), растяжение по ходу, шлейф копий и выхлоп; промах — покачивание и возврат обратной тягой.
+function drawFlight(c, geo, fl, now){
+  const size = geo.cell * 0.8, q0 = fl.size0 || geo.cell * CFG.Q_SCALE0;
+  if (fl.res === 'undo'){ const u = easeOut((now - fl.t0) / (fl.t1 - fl.t0)), q = pathAt(fl.fp, 1 - u);
+    drawPiece(c, q.x, q.y, size + (q0 - size) * u, fl.kind, q.ang, { queued: true, flame: 0.5 * (1 - u), flameFront: true }); return; }
+  if (!fl.arrived){
+    const u = ease((now - fl.t0) / (fl.t1 - fl.t0)), p = flyPos(u), sz = q0 + (size - q0) * u, q = pathAt(fl.fp, p);
+    if (!RM) for (let g = CFG.TRAIL_GHOSTS; g >= 1; g--){
+      const qg = pathAt(fl.fp, flyPos(Math.max(0, u - g * 0.045))); c.globalAlpha = 0.12 * (CFG.TRAIL_GHOSTS + 1 - g) / CFG.TRAIL_GHOSTS;
+      drawPiece(c, qg.x, qg.y, sz, fl.kind, qg.ang, {}); c.globalAlpha = 1;
+    }
+    drawPiece(c, q.x, q.y, sz, fl.kind, q.ang, { queued: true, flame: 0.5 + 0.5 * u, sx: 1 + 0.16 * Math.min(1, u * 3), sy: 1 - 0.08 * Math.min(1, u * 3) });
+    const back = sz * (MOD_LEN[fl.kind] > 1 ? CFG.TRUSS_VL : 1) / 2 + sz * 0.3;
+    if (G.frame % 2 === 0) emit('puff', q.x - Math.cos(q.ang) * back, q.y - Math.sin(q.ang) * back, 1, { ang: q.ang + Math.PI, spread: 0.6, v: 70, drag: 4, life: 360, r: geo.cell * 0.09, col: '#ffb070' });
+    return;
+  }
+  if (!fl.back1) return;
+  const target = frontOf(geo, G.s, fl.li).p, end = pathAt(fl.fp, 1);
+  if (now < fl.back0){                                                // висит на месте промаха и качается (кривая стыковка) или исчез (улетел)
+    if (fl.res === 'off') return;
+    const w = (now - fl.t1) / CFG.WOBBLE_MS, rot = Math.sin(w * 18) * 0.22 * (1 - ease(w));
+    drawPiece(c, end.x, end.y, size, fl.kind, end.ang + rot, { queued: true, tint: css('--bad') }); return;
+  }
+  const u = easeOut((now - fl.back0) / (fl.back1 - fl.back0));
+  if (fl.res === 'off'){                                              // запасной подлетает из-за края к месту в очереди
+    const d = DIR[G.s.lanes[fl.li].side], far = geo.cell * 3, sx = target.x - d[0] * far, sy = target.y - d[1] * far;
+    drawPiece(c, sx + (target.x - sx) * u, sy + (target.y - sy) * u, q0, fl.kind, fl.ang, { queued: true, flame: 0.6 * (1 - u), alpha: 0.4 + 0.6 * u }); return;
+  }
+  const q = pathAt(fl.fp, 1 - u);                                      // обратной тягой по тому же пути
+  drawPiece(c, q.x, q.y, size + (q0 - size) * u, fl.kind, q.ang, { queued: true, flame: 0.7 * (1 - u), flameFront: true });
+}
+// Частицы: дым (круги, растут и бледнеют), искры (короткие штрихи по скорости), конфетти (вращающиеся прямоугольники с гравитацией).
+function drawParts(c, now){
+  for (const p of G.parts){
+    const u = ease((now - p.t0) / (p.t1 - p.t0)); if (now < p.t0) continue;
+    const q = partPos(p, now);
+    if (p.type === 'puff'){ c.globalAlpha = 0.5 * (1 - u); c.fillStyle = p.col; c.beginPath(); c.arc(q.x, q.y, p.r * (1 + 1.5 * u), 0, 7); c.fill(); }
+    else if (p.type === 'spark'){
+      const v = Math.exp(-p.drag * q.t); c.globalAlpha = 1 - u; c.strokeStyle = p.col; c.lineWidth = p.r * 1.6; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(q.x, q.y); c.lineTo(q.x - p.vx * v * 0.03, q.y - p.vy * v * 0.03); c.stroke();
+    } else if (p.type === 'confetti'){
+      c.globalAlpha = 1 - u * u; c.fillStyle = p.col; c.save(); c.translate(q.x, q.y); c.rotate(p.rot + p.vr * q.t); c.scale(1, Math.cos(q.t * 9 + p.rot)); c.fillRect(-p.r, -p.r * 0.55, p.r * 2, p.r * 1.1); c.restore();
+    }
+  }
+  c.globalAlpha = 1;
+}
+// Эффекты: кольцо (расходится), вспышка (свечение), слово (выпрыгивает и всплывает), красная кромка экрана на «улетел»,
+// батарейка «−1», крест промаха.
+function drawFx(c, f, now, geo){
+  if (now < f.t0) return;
+  const u = ease((now - f.t0) / (f.t1 - f.t0));
+  if (f.type === 'ring'){
+    const r = f.r0 + (f.r1 - f.r0) * easeOut(u); c.save(); c.strokeStyle = f.col; c.globalAlpha = 1 - u; c.lineWidth = (f.w || geo.cell * 0.09) * (1 - u) + 1;
+    c.beginPath(); if (f.sq) c.roundRect(f.x - r, f.y - r, r * 2, r * 2, r * 0.3); else c.arc(f.x, f.y, r, 0, 7); c.stroke(); c.restore();
+  } else if (f.type === 'flash') drawGlow(c, f.x, f.y, f.r * (0.6 + 0.6 * u), f.col, (1 - u) * 0.9);
+  else if (f.type === 'word'){
+    const pop = easeOutBack(u / 0.18), y = f.y - geo.cell * 0.6 * easeOut(u), a = u > 0.6 ? 1 - (u - 0.6) / 0.4 : 1, fs = (f.big ? 26 : 20) * pop;
+    c.save(); c.globalAlpha = a; c.font = '800 ' + fs.toFixed(1) + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    const x = Math.max(60, Math.min(W - 60, f.x));
+    c.lineJoin = 'round'; c.lineWidth = 5; c.strokeStyle = '#0b1026'; c.strokeText(f.text, x, y); c.fillStyle = f.col; c.fillText(f.text, x, y); c.restore();
+  } else if (f.type === 'edge'){
+    const w = 60, a = 0.45 * (1 - u), side = f.side;                  // кромка, через которую модуль улетел (противоположная входу)
+    const x0 = side === 'L' ? W - w : 0, y0 = side === 'T' ? H - w : 0, horiz = side === 'L' || side === 'R';
+    const gr = horiz ? c.createLinearGradient(side === 'L' ? W : 0, 0, side === 'L' ? W - w : w, 0) : c.createLinearGradient(0, side === 'T' ? H : 0, 0, side === 'T' ? H - w : w);
+    gr.addColorStop(0, 'rgba(255,90,106,' + a + ')'); gr.addColorStop(1, 'rgba(255,90,106,0)'); c.fillStyle = gr;
+    if (horiz) c.fillRect(side === 'L' ? W - w : 0, 0, w, H); else c.fillRect(0, side === 'T' ? H - w : 0, W, w);
+  } else if (f.type === 'batt'){
+    const y = f.y - geo.cell * 0.9 * easeOut(u), a = u > 0.65 ? 1 - (u - 0.65) / 0.35 : 1, x = Math.max(40, Math.min(W - 40, f.x));
+    c.save(); c.globalAlpha = a; c.fillStyle = css('--bad'); c.strokeStyle = '#0b1026'; c.lineWidth = 3;
+    c.beginPath(); c.roundRect(x - 22, y - 9, 11, 18, 2); c.stroke(); c.fill(); c.fillRect(x - 19.5, y - 12, 6, 3);
+    c.font = '800 18px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'; c.textBaseline = 'middle'; c.lineWidth = 4;
+    c.strokeText('−1', x - 6, y + 1); c.fillText('−1', x - 6, y + 1); c.restore();
+  }
+}
+// Рука-подсказка на обучающих уровнях: на 1-м — сразу, на остальных обучающих — после бездействия; цель — первый ход решения.
+function drawHint(c, geo, s, now){
+  const L = LEVELS[s.li];
+  if (!L.hint || s.li > 3 || G.ending || G.screen !== 'game' || G.press || G.flights.some(f => !f.arrived) || G.introAt) return;
+  if (!(s.li === 0 && s.moves === 0) && now - G.lastInput < CFG.HINT_IDLE_MS) return;
+  const key = s.ptr.join(',') + '|' + s.occ.join('');
+  if (G.hintKey !== key){ G.hintKey = key; const sol = solve(s); G.hintLane = sol && sol.length ? sol[0] : -1; }
+  if (G.hintLane < 0) return;
+  const p = frontOf(geo, s, G.hintLane).p, u = (now % 1100) / 1100, r = geo.cell * (0.5 + 0.4 * u);
+  c.save(); c.strokeStyle = '#ffffff'; c.globalAlpha = 1 - u; c.lineWidth = 3; c.beginPath(); c.arc(p.x, p.y, r, 0, 7); c.stroke(); c.restore();
+  const tap = Math.max(0, Math.sin(now * 0.0057)) ;
+  drawHand(c, p.x + geo.cell * 0.22, p.y + geo.cell * 0.28 + tap * 5, geo.cell * 0.95);
+}
+// Рука: ладонь с вытянутым указательным пальцем, кончик пальца — точка (x, y); контур тёмный.
+function drawHand(c, x, y, s){
+  c.save(); c.translate(x, y); c.rotate(-0.35);
+  c.fillStyle = '#ffffff'; c.strokeStyle = '#1b2458'; c.lineWidth = Math.max(2, s * 0.06); c.lineJoin = 'round';
+  c.beginPath(); c.roundRect(-s * 0.09, 0, s * 0.18, s * 0.52, s * 0.09); c.fill(); c.stroke();
+  c.beginPath(); c.roundRect(-s * 0.22, s * 0.36, s * 0.5, s * 0.44, s * 0.16); c.fill(); c.stroke();
+  c.strokeStyle = 'rgba(27,36,88,0.35)'; c.lineWidth = Math.max(1, s * 0.03);
+  c.beginPath(); c.moveTo(s * 0.02, s * 0.42); c.lineTo(s * 0.02, s * 0.56); c.moveTo(s * 0.14, s * 0.42); c.lineTo(s * 0.14, s * 0.56); c.stroke();
+  c.restore();
+}
+
+// --- цикл: rAF + watchdog setInterval; безопасно, потому что время абсолютное (§4). Кадр — под try/catch. ---
+let lastFrame = 0;
+function safeRender(){ try { render(); } catch (e) { if (G.errors++ < 5) console.error(e); log('event', 'error', e && e.message); } }
+function frame(){ lastFrame = performance.now(); if (!G.paused) safeRender(); requestAnimationFrame(frame); }
+setInterval(() => { if (performance.now() - lastFrame > 120 && !G.paused) safeRender(); }, 40);
+
+// --- дебаг-хук (§6): состояние, любой экран, прогон времени, автоигра ---
+function laneIndex(x){ if (typeof x === 'number') return x; if (!G.s) return -1; return G.s.lanes.findIndex(l => l.side + l.idx === String(x).toUpperCase()); }
+window.STYKOVKA = {
+  G, VERSION,
+  state(){ const s = G.s; return s ? { level: s.li + 1, placed: s.placed, total: s.total, bat: s.bat, moves: s.moves, misses: s.misses, undos: s.undos,
+    dead: s.dead, win: isWin(s), lose: isLose(s), screen: G.screen, flying: G.flights.length, ending: G.ending && G.ending.kind } : { screen: G.screen }; },
+  lanes(){ return G.s ? G.s.lanes.map((l, li) => { const L = landing(G.s, li); return { li, lane: l.side + l.idx, left: l.q.length - G.s.ptr[li], res: L ? L.res : 'empty' }; }) : []; },
+  play(n){ startLevel(Math.max(1, Math.min(LEVELS.length, n || 1)) - 1); return this.state(); },
+  tap(x){ launch(laneIndex(x)); return this.state(); },
+  undo(){ undo(); return this.state(); },
+  goto(screen, payload){ if (!G.s) G.s = createState(G.save.level); goto(screen, payload); return G.screen; },
+  solve(){ return G.s ? (solve(G.s) || []).map(li => G.s.lanes[li].side + G.s.lanes[li].idx) : null; },
+  auto(delayMs){ const path = G.s ? solve(G.s) || [] : []; path.forEach((li, k) => setTimeout(() => launch(li), (delayMs || 450) * (k + 1))); return path.length; },
+  drive(sec){                                   // ручной прогон игрового времени: rAF заморожен в скрытой вкладке
+    const steps = Math.ceil(sec * 1000 / 16);
+    for (let k = 0; k < steps; k++){ G.skew += 16; safeRender(); }
+    return this.state();
+  },
+  speed(x){ setSpeed(x); return G.timeScale; },
+  hint(){ G.lastInput = -1e9; return G.s ? solve(G.s)[0] : null; },
+  reset(){ try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); },
+};
+
+// --- старт ---
+fit(); hud();
+if (location.hash.length > 1) fromHash(); else goto('menu');
+requestAnimationFrame(frame);
+log('event', 'boot', 'v=' + VERSION + ' levels=' + LEVELS.length);
+</script>
+</body>
+</html>
