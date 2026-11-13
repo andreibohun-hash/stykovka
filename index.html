@@ -22,6 +22,35 @@
   :root{ --bg:#dfe4f2; --card:#f6f7fc; --btn:#dfe4f2; --ink:#161a2e; --muted:#5b6386; --space:#15204a; --space2:#2d3c86; }
   header, footer{ color:#f2f4fb; }
 }
+/* Скины графики (13.11.2026): «Постер» — 2D-спрайты в стиле ретро-постера космической эры; «Игрушка» — 3D, глянцевые модели.
+   Цвета кода и интерфейса меняются здесь; спрайты и числа — в таблице SKINS. */
+html[data-skin="retro"]{ --space:#0b2232; --frame:#0b2232; --card:#12304a; --btn:#1d4a57; --accent:#f6b13a; --ink:#f3e3c3; --muted:#b8c6bf;
+  --bp:#46d6c4; --solar:#f6b13a; --solar-edge:#c5821f; --truss:#ff6a4d; --core:#1fa59a; --core-edge:#136f6b; --ok:#8fe3a0; --bad:#ff5a4a;
+  --gate:#a08ae0; --lamp:#ffe7a8; --mirror:#f3e3c3; --flame:#f6b13a; --debris:#b7a58a; --debris-edge:#7d6c55; }
+html[data-skin="toy"]{ --space:#160a30; --frame:#160a30; --card:#2a1658; --btn:#3d2380; --accent:#ffbf2e; --ink:#f4f1fb; --muted:#c3b6ea;
+  --bp:#3ff0ff; --solar:#ffcf3a; --solar-edge:#d98a12; --truss:#ff8a2a; --core:#27e0d0; --core-edge:#0f7f99; --ok:#6dff9a; --bad:#ff4d6d;
+  --gate:#b06bff; --lamp:#fff1a8; --mirror:#e6ecff; --flame:#ffb347; }
+html[data-skin="retro"] #frame{background:#0b2232}
+html[data-skin="retro"] header, html[data-skin="retro"] #banner{color:#f3e3c3}
+html[data-skin="retro"] #banner small{color:#f6b13a}
+html[data-skin="retro"] button{background:#1d4a57;color:#f3e3c3}
+html[data-skin="retro"] footer button{box-shadow:0 3px 0 #061a28}
+html[data-skin="retro"] button.primary{background:#f6b13a;color:#0b2232;box-shadow:0 3px 0 #c5821f}
+html[data-skin="retro"] .card{border:2px solid #f3e3c3;box-shadow:0 0 0 4px #0b2232,0 10px 30px rgba(0,0,0,.45)}
+html[data-skin="retro"] #prog{background:#0b2232;border-color:#f3e3c3}
+html[data-skin="retro"] #prog-fill{background:linear-gradient(90deg,#1fa59a,#46d6c4)}
+html[data-skin="retro"] #toast{background:#1d4a57} html[data-skin="retro"] #toast.bad{background:#b23a2a}
+html[data-skin="toy"] button{background:#3d2380} html[data-skin="toy"] button.primary{background:#ffbf2e;color:#2a1450;box-shadow:0 3px 0 #c27c10} html[data-skin="toy"] footer button{box-shadow:0 3px 0 #1a0b3d}
+html[data-skin="toy"] .card{border-color:#5a3aa8;background:linear-gradient(#34196b,#24104e)}
+html[data-skin="toy"] #prog{background:#1a0b3d;border-color:#6a4ad0} html[data-skin="toy"] #prog-fill{background:linear-gradient(90deg,#27b8e8,#7ff4ff)}
+html[data-skin="toy"] #toast{background:#3d2380}
+#cvb,#cv3{pointer-events:none;display:none}
+.skins{display:flex;gap:6px;justify-content:center;margin:0 0 12px}
+.skins button{flex:1;padding:9px 6px;font-size:14px;background:var(--btn);opacity:.7}
+.skins button.on{opacity:1;outline:2px solid var(--accent)}
+.cheats{margin-top:12px}
+button.cheat{background:transparent !important;border:1.5px dashed var(--muted);color:var(--muted) !important;font-size:13px;padding:7px 10px;box-shadow:none !important}
+.emblem.art{background:none;width:72px;height:72px}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:16px/1.3 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   overflow:hidden;overscroll-behavior:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
@@ -112,7 +141,7 @@ button.primary{box-shadow:0 3px 0 #a8740c}
     <span id="bats"><i class="bat"></i><i class="bat"></i><i class="bat"></i></span>
     <button id="btn-mute" aria-label="звук"></button>
   </header>
-  <div id="game"><canvas id="cv"></canvas><div id="banner"></div></div>
+  <div id="game"><canvas id="cvb"></canvas><canvas id="cv3"></canvas><canvas id="cv"></canvas><div id="banner"></div></div>
   <footer>
     <button id="btn-undo"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 12h9a5 5 0 010 10h-2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>Отмена <i>−1</i></button>
     <button id="btn-reset"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Заново</button>
@@ -514,7 +543,7 @@ function levelMetrics(s0, runs, seed){
 // все анимации — дедлайны по clock(), clock() = реальное время × скорость + прогон drive().
 // ---------------------------------------------------------------------------
 const NAME = 'stykovka';
-const VERSION = '0.3';
+const VERSION = '0.4';
 const T0 = performance.now();
 function log(kind, name, info){            // журнал [game] — одна строка на событие (§11)
   console.log('[game] ' + JSON.stringify({ t: +((performance.now() - T0) / 1000).toFixed(3), kind, name, info: info === undefined ? '' : String(info) }));
@@ -637,12 +666,18 @@ function goto(screen, payload){
   card.className = 'card ' + screen;
   if (screen === 'menu'){
     const cells = LEVELS.map((L, i) => {
-      const b = G.save.best[i] || 0, lock = i > G.save.open;
+      const b = G.save.best[i] || 0, lock = i > G.save.open && !G.save.unlockAll;
       return '<button data-act="lvl" data-li="' + i + '"' + (lock ? ' disabled' : '') + (i === G.save.level ? ' class="cur"' : '') + '>' + (i + 1) +
         '<span class="mini">' + [0, 1, 2].map(k => '<i class="star' + (k < b ? ' on' : '') + '"></i>').join('') + '</span></button>';
     }).join('');
-    card.innerHTML = '<div class="emblem"></div><h2>Стыковка</h2><p>Собери станцию по чертежу. Модуль летит прямо и встаёт у первого, чего коснётся.</p>' +
-      '<div class="levels">' + cells + '</div><div class="row"><button class="primary" data-act="play">Играть</button> <button data-act="help">Как играть</button></div>';
+    const embSrc = SK.art.core || (SK.d3 && r3State === 'ready' ? R3.emblem() : '');
+    const emb = embSrc ? '<img class="emblem art" src="' + embSrc + '" alt="">' : '<div class="emblem"></div>';
+    const skins = ['retro', 'toy'].map(id => '<button data-act="skin" data-id="' + id + '"' + (SK.id === id ? ' class="on"' : '') + '>' + SKINS[id].label + '</button>').join('');
+    card.innerHTML = emb + '<h2>Стыковка</h2><p>Собери станцию по чертежу. Модуль летит прямо и встаёт у первого, чего коснётся.</p>' +
+      '<div class="skins">' + skins + '</div>' +
+      '<div class="levels">' + cells + '</div><div class="row"><button class="primary" data-act="play">Играть</button> <button data-act="help">Как играть</button></div>' +
+      '<div class="row cheats"><button class="cheat" data-act="unlock">' + (G.save.unlockAll ? 'Чит: закрыть уровни' : 'Чит: открыть все уровни') + '</button>' +
+      ' <button class="cheat" data-act="wipe">Сбросить прогресс</button></div>';
   }
   if (screen === 'help') card.innerHTML = '<h2>Как играть</h2><ul class="help-list">' +
     '<li>Тапни модуль у края — он полетит прямо и встанет перед первым, чего коснётся.</li>' +
@@ -672,10 +707,18 @@ $('card').addEventListener('click', (e) => {
   else if (act === 'next') startLevel(Math.min((G.s ? G.s.li : 0) + 1, LEVELS.length - 1));
   else if (act === 'lvl') startLevel(+b.dataset.li);
   else if (act === 'help') goto('help');
+  else if (act === 'skin'){ setSkin(b.dataset.id); goto('menu'); }
+  else if (act === 'unlock'){ setUnlockAll(!G.save.unlockAll); goto('menu'); }
+  else if (act === 'wipe'){ wipeProgress(); goto('menu'); }
   else goto('menu');
 });
+// Чит «Открыть все уровни» (PROTO-BASE §6) и сброс прогресса; выбор скина живёт в сейве.
+function setUnlockAll(on){ G.save.unlockAll = !!on; save(); log('event', 'cheat.unlockAll', String(!!on)); }
+function wipeProgress(){ Object.assign(G.save, { level: 0, open: 0, best: {}, unlockAll: false }); save(); log('event', 'progress.reset'); }
 function fromHash(){
-  const h = location.hash.slice(1), m = /^level=(\d+)$/.exec(h);
+  const h = location.hash.slice(1), m = /^level=(\d+)$/.exec(h), sk = /^skin=(\w+)$/.exec(h);
+  if (sk){ setSkin(sk[1]); return goto('menu'); }
+  if (h === 'unlock'){ setUnlockAll(true); return goto('menu'); }
   if (m) return startLevel(Math.max(0, Math.min(LEVELS.length, +m[1]) - 1));
   if (h === 'game') return startLevel(G.save.level);
   if ((h === 'win' || h === 'lose') && !G.s) G.s = createState(G.save.level);
@@ -700,6 +743,7 @@ function startLevel(li){
   log('event', 'level.start', 'level=' + (li + 1) + ' modules=' + G.s.total + ' lanes=' + G.s.lanes.length);
   log('fx.start', 'intro');
   goto('game'); hud(true);
+  if (D3 || (SK.d3 && r3State === 'ready')) warm3D();
 }
 let prevBat = CFG.BATTERIES, prevPlaced = 0;
 function hud(reset){
@@ -872,7 +916,7 @@ function launch(li){
   emit('puff', bx, by, 9, { ang: ang + Math.PI, spread: 1.6, v: 120, drag: 5, life: 520, r: geo.cell * 0.12, col: '#c9d2f2' });
   G.fx.push({ type: 'ring', x: bx, y: by, t0: now, t1: now + 280, r0: geo.cell * 0.15, r1: geo.cell * 0.7, col: '#ffd27a' });
   const fp = flightPath(geo, L, from);
-  const fl = { li, kind: L.kind, res: L.res, cell: L.cell, cells: L.cells, hit: L.hit, dir: L.dir, ang, t0: now, from, fp, size0: fr.size };
+  const fl = { li, kind: L.kind, res: L.res, cell: L.cell, cells: L.cells, hit: L.hit, dir: L.dir, path: L.path, ang, t0: now, from, fp, size0: fr.size };   // path — для farXY на «мимо» (баг v0.3)
   const dist = fp.total / geo.cell;
   fl.t1 = now + (L.res === 'blocked' && !L.path.length ? 120 : Math.max(CFG.FLY_MIN_MS, dist / CFG.FLY_CPS * 1000));
   // модуль, который встаёт на ещё летящий, не обгоняет его на экране
@@ -1045,6 +1089,7 @@ function fit(){
   scale = r.width / VW; W = VW; H = r.height / scale;
   const w = Math.round(r.width * DPR), h = Math.round(r.height * DPR);
   if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+  if (cvb.width !== w || cvb.height !== h){ cvb.width = w; cvb.height = h; }   // слои 3D-скина: задник и чертёж под моделями
 }
 let fitTimer = 0;
 const refit = () => { clearTimeout(fitTimer); fitTimer = setTimeout(fit, 140); };
@@ -1056,6 +1101,63 @@ document.addEventListener('visibilitychange', () => { G.paused = document.hidden
 // --- рендер: всё в canvas, цвета из CSS-переменных (§9) ---
 const cssCache = {};
 function css(name){ return cssCache[name] || (cssCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#f0f'); }
+// --- скины графики: «Постер» (2D-спрайты GPT) и «Игрушка» (3D: render3d.js + vendor/three.js) — ядро, сим и тесты общие ---
+// art — файлы рядом с index.html (PROTO-BASE §1, §11); цвета деталей, которые рисуются кодом (сопло, пламя, шлюзы, рейки).
+const SKINS = {
+  retro: { id: 'retro', label: '2D · Постер', d3: false,
+    art: { hull: 'assets/retro/hull.png', solar: 'assets/retro/solar.png', core: 'assets/retro/core.png', rock: 'assets/retro/rock.png',
+           mirror: 'assets/retro/mirror.png', truss: 'assets/retro/truss.png', bg1: 'assets/retro/bg1.jpg', bg2: 'assets/retro/bg2.jpg' },
+    ink: '#0b2232', tunnel: '#cdb894', tunnelRim: '#f3e3c3', rail: ['#061a28', '#1d4a57'], dots: 'rgba(243,227,195,0.13)',
+    lane: 'rgba(70,214,196,0.05)', laneOn: 'rgba(70,214,196,0.15)', nozzle: '#c9b48e', flame: ['#e5533d', '#f6b13a', '#fff1d0'], idle: '#7fe0d4',
+    star: '#f3e3c3', arrow: '#f3e3c3', wordInk: '#0b2232', ring: '#f3e3c3' },
+  toy: { id: 'toy', label: '3D · Игрушка', d3: true,
+    art: { bg1: 'assets/toy/bg1.jpg', bg2: 'assets/toy/bg2.jpg' },
+    ink: '#2a1450', tunnel: '#b9b3d6', tunnelRim: '#e9e6f7', rail: ['#12072a', '#3d2380'], dots: 'rgba(200,180,255,0.15)',
+    lane: 'rgba(160,120,255,0.05)', laneOn: 'rgba(120,230,255,0.13)', nozzle: '#c9c4e6', flame: ['#ff7a2c', '#ffd35a', '#fffbe8'], idle: '#7fd6ff',
+    star: '#ffffff', arrow: '#ffffff', wordInk: '#160a30', ring: '#ffffff' },
+  classic: { id: 'classic', label: 'v0.3', d3: false, art: {},                     // прежняя графика кодом — для сравнения (STYKOVKA.skin('classic'))
+    ink: '#3a4468', tunnel: '#8f9bbb', tunnelRim: '#c3cce2', rail: ['#1a2150', '#3a4685'], dots: 'rgba(160,180,255,0.16)',
+    lane: 'rgba(120,150,255,0.045)', laneOn: 'rgba(140,200,255,0.12)', nozzle: '#7d88a8', flame: ['#ff7a2c', '#ffd35a', '#fffbe8'], idle: '#7fd6ff',
+    star: '#ffffff', arrow: '#e8eeff', wordInk: '#0b1026', ring: '#ffffff' },
+};
+let SK = SKINS.retro, D3 = false;                   // D3 — в этом кадре фигуры уходят в 3D-слой (скин «Игрушка», three загружен)
+const IMG = {};
+// Спрайт текущего скина по имени; null, пока не загрузился (тогда рисуется кодом).
+function sprite(name){
+  const src = SK.art[name]; if (!src) return null;
+  let im = IMG[src];
+  if (!im){ im = IMG[src] = new Image(); im.onload = () => { BG.key = ''; }; im.onerror = () => log('event', 'error', 'art ' + src); im.src = src; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+const cvb = $('cvb'), ctxb = cvb.getContext('2d'), cv3 = $('cv3');
+function setSkin(id){
+  SK = SKINS[id] || SKINS.retro; G.save.skin = SK.id; save();
+  document.documentElement.dataset.skin = SK.id; for (const k in cssCache) delete cssCache[k]; BG.key = '';
+  Object.keys(SK.art).forEach(sprite);
+  const on3 = SK.d3; cvb.style.display = on3 ? 'block' : 'none'; cv3.style.display = on3 ? 'block' : 'none';
+  if (on3){ if (r3State === 'ready') warm3D(); else load3D(); }
+  document.querySelector('meta[name=theme-color]').setAttribute('content', css('--space'));
+  log('event', 'skin', SK.id);
+}
+let r3State = '';                                 // '' | 'loading' | 'ready' | 'error'
+function load3D(){
+  if (r3State === 'loading' || r3State === 'ready') return; r3State = 'loading';        // после ошибки — можно ещё раз
+  const add = (src, next) => { const el = document.createElement('script'); el.src = src; el.onload = next;
+    el.onerror = () => { r3State = 'error'; log('event', 'error', 'load ' + src); toast('3D не загрузилось — рисую 2D'); }; document.head.appendChild(el); };
+  add('vendor/three.js', () => add('assets/render3d.js', () => {
+    try { R3.init(cv3); r3State = 'ready'; BG.key = ''; warm3D(); log('event', 'r3.ready', 'three=' + THREE.REVISION); if (G.screen === 'menu') goto('menu'); }
+    catch (e) { r3State = 'error'; console.error(e); log('event', 'error', 'r3 ' + e.message); }
+  }));
+}
+// Прогрев 3D под уровень: пулы моделей на всё, что появится (очереди, шлейф, призрак, шлюзы), и одна отрисовка.
+function warm3D(){
+  if (r3State !== 'ready' || !G.s) return;
+  const s = G.s, n = { 1: 0, 2: 0, 3: 0 }; s.lanes.forEach(l => l.q.forEach(k => n[k]++));
+  const tr = 2 * (CFG.TRAIL_GHOSTS + 1) + 2;          // два полёта одного типа одновременно со шлейфами + призрак превью
+  R3.warm({ hull: n[1] + tr, solar: n[2] + tr, truss: n[3] + tr, core: 1, coreRing: 1, rock: s.debris.length, mirror: s.mirrors.length,
+    emitter: 2 * s.gates.length, tunnel: s.total * 2 + 4, latch: s.total * 2 + 4 }, cv.width, cv.height);
+  log('fx.end', 'warm3d', 'items=' + R3.stats.items);
+}
 const kindCol = (k) => k === SOLAR ? css('--solar') : k === TRUSS ? css('--truss') : css('--bp');
 const ease = (u) => u < 0 ? 0 : u > 1 ? 1 : u;
 const easeOut = (u) => 1 - Math.pow(1 - ease(u), 3);
@@ -1085,11 +1187,36 @@ const CHAPTERS = {
   2: { sky: ['#160b1e', '#3a1631'], neb: [[0.15, 0.2, 0.7, '#d1563b', 0.26], [0.92, 0.45, 0.6, '#c94bd6', 0.18], [0.3, 0.92, 0.7, '#ff9f43', 0.14], [0.75, 0.08, 0.4, '#7b4bd6', 0.16]],
        planet: ['#e07a4a', '#5a1d14', 'rgba(255,180,140,0.45)', 'rgba(150,50,30,0.35)'], ring: false },
 };
+const PLANET = {};
+// Средний цвет верхней строки картины — им заливается полоса над ней на высоких экранах.
+const topCol = new WeakMap();
+function artTopColor(img){
+  if (topCol.has(img)) return topCol.get(img);
+  const c = document.createElement('canvas'); c.width = 16; c.height = 1; const g = c.getContext('2d'); g.drawImage(img, 0, 0, img.naturalWidth, 4, 0, 0, 16, 1);
+  let d; try { d = g.getImageData(0, 0, 16, 1).data; } catch (e) { topCol.set(img, SK.ink); return SK.ink; }   // file:// — холст «грязный»
+  let r = 0, gg = 0, bb = 0; for (let k = 0; k < 64; k += 4){ r += d[k]; gg += d[k + 1]; bb += d[k + 2]; }
+  const col = 'rgb(' + Math.round(r / 16) + ',' + Math.round(gg / 16) + ',' + Math.round(bb / 16) + ')'; topCol.set(img, col); return col;
+}                                   // снимок 3D-планеты по главе и размеру (скин «Игрушка»)
 function drawBackdrop(c){
-  const ch = CHAPTERS[(G.s && LEVELS[G.s.li].ch) || 1], key = cv.width + 'x' + cv.height + ':' + ((G.s && LEVELS[G.s.li].ch) || 1);
+  const chn = (G.s && LEVELS[G.s.li].ch) || 1, ch = CHAPTERS[chn], key = cv.width + 'x' + cv.height + ':' + chn + ':' + SK.id + ':' + r3State;
   if (BG.key !== key){
     BG.key = key; BG.cv.width = cv.width; BG.cv.height = cv.height;
     const b = BG.cv.getContext('2d'); b.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
+    const art = sprite('bg' + chn);
+    if (art){                                                                       // картина главы (GPT): «cover», низ к низу — планета остаётся в углу
+      // по ширине, низ к низу: планета остаётся в углу и не растёт на высоких экранах; сверху — цвет верхней кромки картины
+      const k = SK.d3 ? Math.max(W / art.naturalWidth, H / art.naturalHeight) : Math.max(W / art.naturalWidth, (H * 0.8) / art.naturalHeight), iw = art.naturalWidth * k, ih = art.naturalHeight * k;
+      if (ih < H){ b.fillStyle = artTopColor(art); b.fillRect(0, 0, W, H - ih + 2); }
+      b.drawImage(art, (W - iw) / 2, H - ih, iw, ih);
+      if (SK.d3 && r3State === 'ready'){                                            // 3D: освещённая планета снимком рендера
+        const pr = W * 0.42, side = pr * 4.82, px = Math.min(1024, Math.round(side * DPR * scale));        // один снимок на главу, не больше 1024²
+        if (!PLANET[chn] || PLANET[chn].width !== px) PLANET[chn] = R3.planet(chn, px);
+        const pl = PLANET[chn];
+        if (pl) b.drawImage(pl, W * 0.92 - side / 2, H * 1.04 - side / 2, side, side);
+      }
+      BG.art = true;
+    } else BG.art = false;
+    if (!BG.art){
     const gr = b.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, ch.sky[0]); gr.addColorStop(1, ch.sky[1]);
     b.fillStyle = gr; b.fillRect(0, 0, W, H);
     for (const [x, y, r, col, a] of ch.neb){
@@ -1118,6 +1245,7 @@ function drawBackdrop(c){
     b.fillStyle = '#9aa3c2'; b.beginPath(); b.arc(mx, my, mr, 0, 7); b.fill();
     b.fillStyle = '#7a83a6'; b.beginPath(); b.arc(mx + 4, my - 3, 3.2, 0, 7); b.arc(mx - 4, my + 4, 2.2, 0, 7); b.fill();
     b.fillStyle = 'rgba(11,16,38,0.45)'; b.beginPath(); b.arc(mx + 5, my + 3, mr, 0, 7); b.fill();
+    }
   }
   c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(BG.cv, 0, 0); c.restore();
 }
@@ -1125,7 +1253,7 @@ function drawBackdrop(c){
 function drawSky(c, now){
   for (const st of STARS){
     const y = (st.y * H + now * 0.006 * st.z) % H;
-    c.globalAlpha = 0.3 + 0.4 * Math.sin(now * 0.0018 + st.ph); c.fillStyle = '#ffffff'; c.fillRect(st.x * W, y, st.s, st.s);
+    c.globalAlpha = 0.3 + 0.4 * Math.sin(now * 0.0018 + st.ph); c.fillStyle = SK.star; c.fillRect(st.x * W, y, st.s, st.s);
   }
   c.globalAlpha = 1;
   const slot = Math.floor(now / 7000), r = mulberry32(slot * 7919 + 1), at = slot * 7000 + r() * 4000, u = (now - at) / 650;
@@ -1139,9 +1267,13 @@ function drawSky(c, now){
 
 function render(){
   const now = clock(); G.frame++;
-  ctx.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
-  drawBackdrop(ctx); drawSky(ctx, now);
-  if (!G.s) return;
+  D3 = SK.d3 && r3State === 'ready';
+  // 3D-скин: задник, чертёж и рейки — нижний 2D-слой (cvb), фигуры — WebGL (cv3), эффекты и превью — верхний 2D (cv)
+  const cb = D3 ? ctxb : ctx;
+  if (D3){ ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); R3.begin(); }
+  ctx.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0); cb.setTransform(DPR * scale, 0, 0, DPR * scale, 0, 0);
+  drawBackdrop(cb); drawSky(cb, now);
+  if (!G.s){ if (D3) R3.end(cv.width, cv.height); return; }
   const s = G.s, geo = geom();
   // дедлайны: прилёт, возврат, финал, тост
   if (G.sched.length){ const due = G.sched.filter(e => now >= e.at); G.sched = G.sched.filter(e => now < e.at); due.forEach(e => e.fn()); }
@@ -1156,12 +1288,15 @@ function render(){
   if (toastUntil && now > toastUntil){ $('toast').classList.add('hide'); toastUntil = 0; }
   const cp = cellXY(geo, s.core[0]);
 
-  ctx.save();
-  if (now < G.shakeUntil && !RM){ const k = (G.shakeUntil - now) / CFG.SHAKE_MS, a = Math.sin(now * 0.09) * CFG.SHAKE_PX * G.shakeAmp * k;
-    ctx.translate(Math.cos(G.shakeAng) * a, Math.sin(G.shakeAng) * a); }
-  if (G.winAt && !RM){ const z = 1 + (CFG.WIN_ZOOM - 1) * easeOut((now - G.winAt) / 900); ctx.translate(cp.x, cp.y); ctx.scale(z, z); ctx.translate(-cp.x, -cp.y); }
-  drawGridDots(ctx, geo, now);
-  drawLaneGuides(ctx, geo, s);
+  const both = D3 ? [ctx, ctxb] : [ctx];                                            // тряска и приближение — одинаково на всех слоях
+  for (const c of both){
+    c.save();
+    if (now < G.shakeUntil && !RM){ const k = (G.shakeUntil - now) / CFG.SHAKE_MS, a = Math.sin(now * 0.09) * CFG.SHAKE_PX * G.shakeAmp * k;
+      c.translate(Math.cos(G.shakeAng) * a, Math.sin(G.shakeAng) * a); }
+    if (G.winAt && !RM){ const z = 1 + (CFG.WIN_ZOOM - 1) * easeOut((now - G.winAt) / 900); c.translate(cp.x, cp.y); c.scale(z, z); c.translate(-cp.x, -cp.y); }
+  }
+  drawGridDots(cb, geo, now);
+  drawLaneGuides(cb, geo, s);
   const target = pendingTargets(s, now);
   const docksShown = s.hist.length - G.flights.filter(f => f.res === 'dock' && !f.arrived).length;   // поля считают по экрану
   const free = (i) => s.occ[i] <= 0 || G.pending.has(i);
@@ -1171,15 +1306,15 @@ function render(){
     if (s.bp[i] === TRUSS){                                                            // ферма — один двойной пунктир на пару клеток
       const j = s.grp.findIndex((g, k) => k !== i && g === s.grp[i]); if (j < i && j >= 0) continue;
       const a = cellXY(geo, i), b = cellXY(geo, j);
-      drawTrussBlueprint(ctx, a, b, geo.cell * u, now, target.has(i) || target.has(j));
-    } else { const p = cellXY(geo, i); drawBlueprintCell(ctx, p.x, p.y, geo.cell * u, s.bp[i], now, target.has(i)); }
+      drawTrussBlueprint(cb, a, b, geo.cell * u, now, target.has(i) || target.has(j));
+    } else { const p = cellXY(geo, i); drawBlueprintCell(cb, p.x, p.y, geo.cell * u, s.bp[i], now, target.has(i)); }
   }
   for (const i of s.debris){ const p = cellXY(geo, i), u = introU(geo, i, cp, now, 60); if (u > 0) drawDebris(ctx, p.x, p.y, geo.cell * u, i, now); }
   for (const i of s.mirrors){ const p = cellXY(geo, i), u = introU(geo, i, cp, now, 60); if (u > 0) drawMirror(ctx, p.x, p.y, geo.cell * u, s.base[i], now, G.mirrorHit[i]); }
   for (const i of s.gates) if (s.occ[i] === GATE || G.pending.has(i)){ const p = cellXY(geo, i), u = introU(geo, i, cp, now, 60);
-    if (u > 0) drawGate(ctx, p.x, p.y, geo.cell * u, s.gate[i] - docksShown, now, !!s.bp[i]); }
+    if (u > 0) drawGate(cb, p.x, p.y, geo.cell * u, s.gate[i] - docksShown, now, !!s.bp[i]); }
   drawStation(ctx, geo, s, now, cp);
-  ctx.restore();
+  for (const c of both) c.restore();
 
   drawQueues(ctx, geo, s, now);
   if (G.press && G.press.li >= 0 && G.screen === 'game' && !G.ending) drawPreview(ctx, geo, s, G.press.li, now);
@@ -1187,6 +1322,7 @@ function render(){
   drawParts(ctx, now);
   for (const f of G.fx) drawFx(ctx, f, now, geo);
   drawHint(ctx, geo, s, now);
+  if (D3) R3.end(cv.width, cv.height);
   if (G.introAt && now > G.introAt + CFG.INTRO_MS + 400){ G.introAt = 0; log('fx.end', 'intro'); }
 }
 // Появление уровня: клетка чертежа «выпрыгивает» с задержкой по расстоянию от ядра.
@@ -1203,7 +1339,7 @@ function pendingTargets(s, now){
 }
 // Точки в центрах клеток: по ним читаются линии полёта.
 function drawGridDots(c, geo){
-  c.fillStyle = 'rgba(160,180,255,0.16)';
+  c.fillStyle = SK.dots;
   for (let y = 0; y < geo.gh; y++) for (let x = 0; x < geo.gw; x++){ c.beginPath(); c.arc(geo.ox + (x + 0.5) * geo.cell, geo.oy + (y + 0.5) * geo.cell, geo.cell * 0.035, 0, 7); c.fill(); }
 }
 // Полоса линии у каждой живой очереди; линия под пальцем — ярче.
@@ -1211,7 +1347,7 @@ function drawLaneGuides(c, geo, s){
   s.lanes.forEach((ln, li) => {
     if (s.ptr[li] >= ln.q.length) return;
     const on = G.press && G.press.li === li;
-    c.fillStyle = on ? 'rgba(140,200,255,0.12)' : 'rgba(120,150,255,0.045)';
+    c.fillStyle = on ? SK.laneOn : SK.lane;
     if (ln.side === 'L' || ln.side === 'R') c.fillRect(geo.ox, geo.oy + ln.idx * geo.cell + geo.cell * 0.22, geo.gw * geo.cell, geo.cell * 0.56);
     else c.fillRect(geo.ox + ln.idx * geo.cell + geo.cell * 0.22, geo.oy, geo.cell * 0.56, geo.gh * geo.cell);
   });
@@ -1224,14 +1360,18 @@ function drawBlueprintCell(c, x, y, size, kind, now, hot){
   c.fillStyle = col; c.globalAlpha = hot ? 0.24 : 0.06 + 0.04 * pulse; c.beginPath(); c.roundRect(x - w / 2, y - w / 2, w, w, size * 0.16); c.fill();
   c.globalAlpha = hot ? 1 : 0.85; c.strokeStyle = col; c.lineWidth = Math.max(1.5, size * 0.055); c.setLineDash([size * 0.13, size * 0.09]);
   c.lineDashOffset = -now * 0.012; c.stroke();
-  c.setLineDash([]); c.globalAlpha = hot ? 0.8 : 0.4; c.lineWidth = Math.max(1, size * 0.04);
-  if (kind === SOLAR){ c.strokeRect(x - w * 0.27, y - w * 0.27, w * 0.54, w * 0.54); c.beginPath(); c.moveTo(x, y - w * 0.27); c.lineTo(x, y + w * 0.27); c.moveTo(x - w * 0.27, y); c.lineTo(x + w * 0.27, y); c.stroke(); }
-  else { c.beginPath(); c.arc(x, y - size * 0.04, w * 0.2, 0, 7); c.stroke(); }
+  c.setLineDash([]); c.globalAlpha = hot ? 0.9 : 0.62; c.lineWidth = Math.max(1.2, size * 0.05);
+  if (kind === SOLAR){ c.strokeRect(x - w * 0.3, y - w * 0.3, w * 0.6, w * 0.6); c.beginPath(); c.moveTo(x, y - w * 0.3); c.lineTo(x, y + w * 0.3); c.moveTo(x - w * 0.3, y); c.lineTo(x + w * 0.3, y); c.stroke(); }
+  else { c.beginPath(); c.arc(x, y, w * 0.24, 0, 7); c.stroke(); c.beginPath(); c.arc(x, y, w * 0.08, 0, 7); c.fill(); }
   c.restore();
 }
 // Обломок: неровный многоугольник из 8 вершин с контуром и кратерами, медленно вращается; форма от номера клетки.
 function drawDebris(c, x, y, size, seed, now){
-  const R = size * 0.42, rot = now * 0.00025 + seed, lw = Math.max(1.5, size * 0.06), r = mulberry32(seed * 7 + 3), pts = [];
+  const rot0 = now * 0.00025 + seed;
+  if (D3 && c === ctx) return R3.rock(c, x, y, size, rot0);
+  const spr = sprite('rock');
+  if (spr){ c.save(); c.translate(x, y); c.rotate(rot0); const k = size * 0.92; c.drawImage(spr, -k / 2, -k / 2, k, k); c.restore(); return; }
+  const R = size * 0.42, rot = rot0, lw = Math.max(1.5, size * 0.06), r = mulberry32(seed * 7 + 3), pts = [];
   for (let k = 0; k < 8; k++){ const a = rot + k / 8 * 6.283, rr = R * (0.72 + r() * 0.28); pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]); }
   c.fillStyle = css('--debris'); c.strokeStyle = '#2a2436'; c.lineWidth = lw; c.lineJoin = 'round';
   c.beginPath(); pts.forEach(p => c.lineTo(p[0], p[1])); c.closePath(); c.fill();
@@ -1245,7 +1385,7 @@ function drawDebris(c, x, y, size, seed, now){
 function drawStation(c, geo, s, now, cp){
   const gw = geo.gw, cell = geo.cell, on = (i) => (s.occ[i] === CORE || s.occ[i] > 0) && !G.pending.has(i);
   const coreU = G.introAt ? easeOutBack((now - G.introAt) / 320) : 1;
-  drawGlow(c, cp.x, cp.y, cell * (1.7 + 0.15 * Math.sin(now * 0.003)) * coreU, css('--core'), G.winAt ? 0.9 : 0.45);
+  drawGlow(D3 ? ctxb : c, cp.x, cp.y, cell * (1.7 + 0.15 * Math.sin(now * 0.003)) * coreU, css('--core'), G.winAt ? 0.9 : 0.45);
   const sameTruss = (a, b) => s.occ[a] === TRUSS && s.occ[b] === TRUSS && s.grp[a] > 0 && s.grp[a] === s.grp[b];
   for (let i = 0; i < s.occ.length; i++){
     if (!on(i)) continue; const x = i % gw;
@@ -1284,40 +1424,35 @@ function drawPiece(c, x, y, size, kind, ang, o){ if (kind === TRUSS) drawTruss(c
 // ang — вдоль чего лежит; o.queued/o.flame — сопло и пламя сзади (как у модуля); o.lit — огни по рейкам; o.tint — обводка.
 function drawTruss(c, x, y, size, ang, o){
   o = o || {};
-  const L = size * CFG.TRUSS_VL, h = L / 2, t = size * 0.34, lw = Math.max(1.2, size * 0.07), ink = '#3a4468';
+  if (D3 && c === ctx){ R3.piece(c, x, y, size, TRUSS, ang, o); drawPieceExtras(c, x, y, size, ang, o, size * CFG.TRUSS_VL / 2); return; }
+  const L = size * CFG.TRUSS_VL, h = L / 2, t = size * 0.34, lw = Math.max(1.2, size * 0.07), ink = SK.ink;
   c.save(); c.translate(x, y); c.rotate(ang);
   if (o.sx || o.sy){ c.rotate((o.sxAng || 0) - ang); c.scale(o.sx || 1, o.sy || 1); c.rotate(ang - (o.sxAng || 0)); }
   if (o.alpha !== undefined) c.globalAlpha = o.alpha;
   c.lineJoin = 'round'; c.lineCap = 'round';
-  if (o.queued || o.flame){
-    const fl = o.flame || 0;
-    if (fl > 0 && !o.flameFront){ const FL = size * (0.3 + 0.75 * fl) * (0.85 + 0.15 * Math.sin(performance.now() * 0.06));
-      drawGlow(c, -h - size * 0.2, 0, size * 0.7 * fl, '#ff9a3c', 0.8);
-      c.fillStyle = '#ff7a2c'; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.2); c.quadraticCurveTo(-h - FL * 0.6, 0, -h - FL, 0); c.quadraticCurveTo(-h - FL * 0.6, 0, -h - size * 0.14, size * 0.2); c.fill();
-      c.fillStyle = '#ffd35a'; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.1); c.lineTo(-h - FL * 0.6, 0); c.lineTo(-h - size * 0.14, size * 0.1); c.fill(); }
-    if (fl > 0 && o.flameFront){ c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(h + size * 0.05, -size * 0.12); c.lineTo(h + size * 0.45 * fl, 0); c.lineTo(h + size * 0.05, size * 0.12); c.fill(); }
-    c.fillStyle = '#7d88a8'; c.strokeStyle = ink; c.lineWidth = lw * 0.8;
-    c.beginPath(); c.moveTo(-h + 1, -size * 0.18); c.lineTo(-h - size * 0.15, -size * 0.25); c.lineTo(-h - size * 0.15, size * 0.25); c.lineTo(-h + 1, size * 0.18); c.closePath(); c.fill(); c.stroke();
+  if (o.queued || o.flame) drawThruster(c, h, size, o, x, lw, true);
+  const spr = sprite('truss');
+  if (spr){                                                                         // спрайт фермы лежит вдоль полёта
+    c.drawImage(spr, -h, -size * 0.5, L, size);
+    if (o.lit) for (const ex of [-h + size * 0.2, h - size * 0.2]) drawGlow(c, ex, 0, size * 0.45, css('--lamp'), 0.7 * o.lit);
+  } else {
+    // рейки и раскосы
+    c.strokeStyle = ink; c.lineWidth = lw * 2.4;
+    c.beginPath(); c.moveTo(-h + size * 0.2, -t); c.lineTo(h - size * 0.2, -t); c.moveTo(-h + size * 0.2, t); c.lineTo(h - size * 0.2, t); c.stroke();
+    const n = 5, zig = []; for (let k = 0; k <= n; k++) zig.push([-h + size * 0.25 + (L - size * 0.5) * k / n, k % 2 ? t : -t]);
+    c.beginPath(); zig.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
+    c.strokeStyle = '#c3cce2'; c.lineWidth = lw * 1.2;
+    c.beginPath(); c.moveTo(-h + size * 0.2, -t); c.lineTo(h - size * 0.2, -t); c.moveTo(-h + size * 0.2, t); c.lineTo(h - size * 0.2, t); c.stroke();
+    c.beginPath(); zig.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
+    // торцевые узлы
+    for (const ex of [-h + size * 0.2, h - size * 0.2]){
+      c.fillStyle = css('--truss'); c.strokeStyle = ink; c.lineWidth = lw;
+      c.beginPath(); c.roundRect(ex - size * 0.2, -size * 0.42, size * 0.4, size * 0.84, size * 0.12); c.fill(); c.stroke();
+      c.fillStyle = o.lit ? css('--lamp') : '#ffd9a8'; c.beginPath(); c.arc(ex, 0, size * 0.09, 0, 7); c.fill();
+      if (o.lit) drawGlow(c, ex, 0, size * 0.45, css('--lamp'), 0.7 * o.lit);
+    }
   }
-  // рейки и раскосы
-  c.strokeStyle = ink; c.lineWidth = lw * 2.4;
-  c.beginPath(); c.moveTo(-h + size * 0.2, -t); c.lineTo(h - size * 0.2, -t); c.moveTo(-h + size * 0.2, t); c.lineTo(h - size * 0.2, t); c.stroke();
-  const n = 5, zig = []; for (let k = 0; k <= n; k++) zig.push([-h + size * 0.25 + (L - size * 0.5) * k / n, k % 2 ? t : -t]);
-  c.beginPath(); zig.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
-  c.strokeStyle = '#c3cce2'; c.lineWidth = lw * 1.2;
-  c.beginPath(); c.moveTo(-h + size * 0.2, -t); c.lineTo(h - size * 0.2, -t); c.moveTo(-h + size * 0.2, t); c.lineTo(h - size * 0.2, t); c.stroke();
-  c.beginPath(); zig.forEach((p, k) => k ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke();
-  // торцевые узлы
-  for (const ex of [-h + size * 0.2, h - size * 0.2]){
-    c.fillStyle = css('--truss'); c.strokeStyle = ink; c.lineWidth = lw;
-    c.beginPath(); c.roundRect(ex - size * 0.2, -size * 0.42, size * 0.4, size * 0.84, size * 0.12); c.fill(); c.stroke();
-    c.fillStyle = o.lit ? css('--lamp') : '#ffd9a8'; c.beginPath(); c.arc(ex, 0, size * 0.09, 0, 7); c.fill();
-    if (o.lit) drawGlow(c, ex, 0, size * 0.45, css('--lamp'), 0.7 * o.lit);
-  }
-  if (o.queued){
-    c.fillStyle = '#e8eeff'; c.strokeStyle = ink; c.lineWidth = lw * 0.7;
-    c.beginPath(); c.moveTo(h + size * 0.08, -size * 0.13); c.lineTo(h + size * 0.24, 0); c.lineTo(h + size * 0.08, size * 0.13); c.closePath(); c.fill(); c.stroke();
-  }
+  if (o.queued) drawNose(c, h, size, lw);
   if (o.tint){ c.strokeStyle = o.tint; c.lineWidth = Math.max(2.5, size * 0.1); c.beginPath(); c.roundRect(-h - 3, -size * 0.5 - 3, L + 6, size + 6, size * 0.25); c.stroke(); }
   c.restore();
 }
@@ -1329,7 +1464,8 @@ function drawTrussBlueprint(c, a, b, size, now, hot){
   c.save(); c.fillStyle = col; c.globalAlpha = hot ? 0.24 : 0.06 + 0.04 * pulse;
   c.beginPath(); c.roundRect(mx - w / 2, my - hh / 2, w, hh, size * 0.18); c.fill();
   c.globalAlpha = hot ? 1 : 0.85; c.strokeStyle = col; c.lineWidth = Math.max(1.5, size * 0.055); c.setLineDash([size * 0.13, size * 0.09]); c.lineDashOffset = -now * 0.012; c.stroke();
-  c.setLineDash([]); c.globalAlpha = hot ? 0.8 : 0.45; c.lineWidth = Math.max(1, size * 0.045);
+  c.setLineDash([]); c.globalAlpha = hot ? 0.9 : 0.62; c.lineWidth = Math.max(1.2, size * 0.05);
+  for (const q of [a, b]){ c.beginPath(); c.arc(q.x, q.y, size * 0.07, 0, 7); c.fill(); }                 // два места посадки — «две клетки»
   c.translate(mx, my); if (!horiz) c.rotate(Math.PI / 2);
   c.beginPath(); for (let k = 0; k <= 4; k++){ const x = -size * 0.6 + size * 1.2 * k / 4, y = k % 2 ? size * 0.16 : -size * 0.16; k ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke();
   c.restore();
@@ -1337,7 +1473,10 @@ function drawTrussBlueprint(c, a, b, size, now, hot){
 // Отражатель: тёмная круглая площадка и зеркальная планка по диагонали ('/' или '\\'); вспыхивает, когда сквозь него прошёл модуль.
 function drawMirror(c, x, y, size, type, now, hitAt){
   const r = size * 0.42, flash = hitAt ? 1 - ease((now - hitAt) / 350) : 0, lw = Math.max(1.5, size * 0.06);
+  if (D3 && c === ctx){ R3.mirror(c, x, y, size, type === MIRROR_A, flash); if (flash > 0) drawGlow(c, x, y - size * 0.1, size * 0.9, css('--mirror'), flash); return; }
   if (flash > 0) drawGlow(c, x, y, size * 0.9, css('--mirror'), flash);
+  const spr = sprite('mirror');
+  if (spr){ c.save(); c.translate(x, y); if (type !== MIRROR_A) c.scale(-1, 1); const k = size * 0.9; c.drawImage(spr, -k / 2, -k / 2, k, k); c.restore(); return; }
   c.save(); c.translate(x, y); c.rotate(type === MIRROR_A ? -Math.PI / 4 : Math.PI / 4);
   c.fillStyle = '#1a2150'; c.strokeStyle = '#3a4685'; c.lineWidth = lw; c.beginPath(); c.arc(0, 0, r, 0, 7); c.fill(); c.stroke();
   c.fillStyle = '#2b3566'; for (const a of [0.8, 2.35, 3.95, 5.5]){ c.beginPath(); c.arc(Math.cos(a) * r * 0.72, Math.sin(a) * r * 0.72, size * 0.035, 0, 7); c.fill(); }
@@ -1362,47 +1501,62 @@ function drawGate(c, x, y, size, left, now, over){
       for (let s = 1; s <= 6; s++) c.lineTo(x - h2 + size * 0.12 + (w - size * 0.24) * s / 6, yy + Math.sin(now * 0.03 + s * 2 + k) * size * 0.03); c.stroke(); }
     c.globalAlpha = 1;
   }
-  for (const sx of [-1, 1]){                                                         // излучатели
+  if (D3) R3.emitters(ctx, x, y, size, open);
+  else for (const sx of [-1, 1]){                                                    // излучатели
     c.fillStyle = open ? '#3a4466' : '#5b3f8a'; c.strokeStyle = '#1e1640'; c.lineWidth = lw;
     c.beginPath(); c.roundRect(x + sx * h2 - size * 0.08, y - h2, size * 0.16, w, size * 0.06); c.fill(); c.stroke();
     c.fillStyle = open ? '#59607e' : col; c.beginPath(); c.arc(x + sx * h2, y - h2 + size * 0.14, size * 0.05, 0, 7); c.arc(x + sx * h2, y + h2 - size * 0.14, size * 0.05, 0, 7); c.fill();
   }
-  if (!open){
-    c.fillStyle = '#1e1640'; c.strokeStyle = col; c.lineWidth = lw; c.beginPath(); c.arc(x, y, size * 0.22, 0, 7); c.fill(); c.stroke();
-    c.fillStyle = '#ffffff'; c.font = '800 ' + (size * 0.3).toFixed(1) + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-    c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(left), x, y + size * 0.01);
-  }
   c.restore();
+  if (!open){                                                                        // счётчик — крупный бейдж; в 3D поверх моделей
+    const t = D3 ? ctx : c; t.save();
+    t.fillStyle = '#1e1640'; t.strokeStyle = col; t.lineWidth = lw; t.beginPath(); t.arc(x, y, size * 0.27, 0, 7); t.fill(); t.stroke();
+    t.fillStyle = '#ffffff'; t.font = '800 ' + Math.max(13, size * 0.4).toFixed(1) + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    t.textAlign = 'center'; t.textBaseline = 'middle'; t.fillText(String(left), x, y + size * 0.015); t.restore();
+  }
 }
 // Шлюз между двумя клетками станции: трубка с ободом посередине; после стыковки обод вспыхивает и защёлкивается.
 function drawTunnel(c, geo, a, b, now){
   const pa = cellXY(geo, a), pb = cellXY(geo, b), horiz = Math.abs(pa.y - pb.y) < 1, cell = geo.cell, t = cell * 0.3, lw = Math.max(1.2, cell * 0.05);
   const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
-  c.fillStyle = '#8f9bbb'; c.strokeStyle = '#3a4468'; c.lineWidth = lw;
+  if (D3 && c === ctx){
+    const f = G.cellFx[a] && G.cellFx[b] ? (G.cellFx[a].t0 > G.cellFx[b].t0 ? G.cellFx[a] : G.cellFx[b]) : G.cellFx[a] || G.cellFx[b];
+    const u = f ? (now - f.t0) / CFG.LATCH_MS : 1, flash = f && u < 1 ? 1 - u : 0;
+    R3.tunnel(c, pa.x, pa.y, pb.x, pb.y, cell, flash, f ? easeOutBack(u) : 1);
+    if (flash) drawGlow(c, mx, my - cell * 0.1, cell * 0.6, css('--lamp'), flash * 0.8); return;
+  }
+  c.fillStyle = SK.tunnel; c.strokeStyle = SK.ink; c.lineWidth = lw;
   c.beginPath(); if (horiz) c.rect(pa.x, my - t / 2, pb.x - pa.x, t); else c.rect(mx - t / 2, pa.y, t, pb.y - pa.y); c.fill(); c.stroke();
   const fa = G.cellFx[a], fb = G.cellFx[b], f = fa && fb ? (fa.t0 > fb.t0 ? fa : fb) : fa || fb;
   const u = f ? (now - f.t0) / CFG.LATCH_MS : 1, flash = f && u < 1 ? 1 - u : 0, close = f ? easeOutBack(u) : 1;
   const cw = cell * 0.14, ch = t * (1.15 + 0.5 * (1 - close));
-  c.fillStyle = flash ? css('--lamp') : '#c3cce2';
+  c.fillStyle = flash ? css('--lamp') : SK.tunnelRim;
   c.beginPath(); if (horiz) c.roundRect(mx - cw / 2, my - ch / 2, cw, ch, 2); else c.roundRect(mx - ch / 2, my - cw / 2, ch, cw, 2); c.fill(); c.stroke();
   if (flash) drawGlow(c, mx, my, cell * 0.6, css('--lamp'), flash * 0.8);
 }
 // Ядро станции: шестигранник с контуром, вращающееся кольцо из трёх дуг, маячки по вершинам по очереди.
 function drawCore(c, x, y, size, now, blackout){
   if (size <= 0) return;
+  if (D3 && c === ctx) return R3.core(c, x, y, size, now, blackout, !!G.winAt);
   const R = size * 0.52, hex = (r) => { c.beginPath(); for (let k = 0; k < 6; k++){ const a = k / 6 * 6.283 + Math.PI / 6; c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } c.closePath(); };
-  c.lineJoin = 'round'; c.lineWidth = Math.max(1.5, size * 0.07); c.strokeStyle = '#1e2a66';
-  hex(R); c.fillStyle = css('--core-edge'); c.fill(); c.stroke();
-  hex(R * 0.78); c.fillStyle = css('--core'); c.fill();
-  c.save(); hex(R * 0.78); c.clip(); c.fillStyle = 'rgba(255,255,255,0.18)'; c.beginPath(); c.arc(x - R * 0.4, y - R * 0.5, R * 0.7, 0, 7); c.fill(); c.restore();
-  const rot = now * 0.0016;
-  c.strokeStyle = blackout ? css('--bad') : '#ffffff'; c.lineWidth = size * 0.07; c.lineCap = 'round';
-  for (let k = 0; k < 3; k++){ c.beginPath(); c.arc(x, y, R * 0.42, rot + k * 2.094, rot + k * 2.094 + 1.4); c.stroke(); }
-  c.fillStyle = '#e8f0ff'; c.beginPath(); c.arc(x, y, R * 0.16, 0, 7); c.fill();
-  for (let k = 0; k < 6; k += 2){
+  const spr = sprite('core'), rot = now * 0.0016;
+  if (spr){                                                                          // спрайт ядра + вращающееся кольцо вокруг звезды
+    const k = size * 1.12; c.drawImage(spr, x - k / 2, y - k / 2, k, k);
+    c.save(); c.strokeStyle = blackout ? css('--bad') : SK.ring; c.globalAlpha = 0.75; c.lineWidth = size * 0.05; c.lineCap = 'round';
+    for (let j = 0; j < 3; j++){ c.beginPath(); c.arc(x, y, R * 0.5, rot + j * 2.094, rot + j * 2.094 + 1.2); c.stroke(); } c.restore();
+  } else {
+    c.lineJoin = 'round'; c.lineWidth = Math.max(1.5, size * 0.07); c.strokeStyle = '#1e2a66';
+    hex(R); c.fillStyle = css('--core-edge'); c.fill(); c.stroke();
+    hex(R * 0.78); c.fillStyle = css('--core'); c.fill();
+    c.save(); hex(R * 0.78); c.clip(); c.fillStyle = 'rgba(255,255,255,0.18)'; c.beginPath(); c.arc(x - R * 0.4, y - R * 0.5, R * 0.7, 0, 7); c.fill(); c.restore();
+    c.strokeStyle = blackout ? css('--bad') : '#ffffff'; c.lineWidth = size * 0.07; c.lineCap = 'round';
+    for (let k = 0; k < 3; k++){ c.beginPath(); c.arc(x, y, R * 0.42, rot + k * 2.094, rot + k * 2.094 + 1.4); c.stroke(); }
+    c.fillStyle = '#e8f0ff'; c.beginPath(); c.arc(x, y, R * 0.16, 0, 7); c.fill();
+  }
+  for (let k = 0; k < 6; k += 2){                                                    // маячки по вершинам по очереди
     const a = k / 6 * 6.283 + Math.PI / 6, on = Math.floor(now / 380) % 3 === k / 2;
     const col = blackout ? css('--bad') : G.winAt ? css('--lamp') : css('--ok');
-    c.fillStyle = on || G.winAt ? col : '#2b3566'; c.beginPath(); c.arc(x + Math.cos(a) * R * 0.92, y + Math.sin(a) * R * 0.92, size * 0.065, 0, 7); c.fill();
+    c.fillStyle = on || G.winAt ? col : spr ? SK.ink : '#2b3566'; c.beginPath(); c.arc(x + Math.cos(a) * R * 0.92, y + Math.sin(a) * R * 0.92, size * 0.065, 0, 7); c.fill();
     if (on || G.winAt) drawGlow(c, x + Math.cos(a) * R * 0.92, y + Math.sin(a) * R * 0.92, size * 0.25, col, 0.7);
   }
 }
@@ -1412,29 +1566,67 @@ function drawCore(c, x, y, size, now, blackout){
 // o.unrot — корпус не поворачивать (пристыкованный модуль стоит ровно, сплющивание всё равно по направлению удара).
 function drawModule(c, x, y, size, kind, ang, o){
   o = o || {};
-  const h = size / 2, solar = kind === SOLAR, lw = Math.max(1.2, size * 0.07), ink = '#3a4468';
+  if (D3 && c === ctx){ R3.piece(c, x, y, size, kind, ang, o); drawPieceExtras(c, x, y, size, ang, o, size / 2); return; }   // корпус — 3D-модель
+  const h = size / 2, solar = kind === SOLAR, lw = Math.max(1.2, size * 0.07), ink = SK.ink;
   c.save(); c.translate(x, y); c.rotate(ang); c.scale(o.sx || 1, o.sy || 1); if (o.unrot) c.rotate(-ang);
   if (o.alpha !== undefined) c.globalAlpha = o.alpha;
   c.lineJoin = 'round'; c.lineCap = 'round';
-  if ((o.queued || o.flame) && !o.unrot){
-    const fl = o.flame || 0, t = performance.now();
-    if (fl > 0 && !o.flameFront){
-      const L = size * (0.3 + 0.75 * fl) * (0.85 + 0.15 * Math.sin(t * 0.06));
-      drawGlow(c, -h - size * 0.2, 0, size * 0.7 * fl, '#ff9a3c', 0.8);
-      c.fillStyle = '#ff7a2c'; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.2); c.quadraticCurveTo(-h - L * 0.6, -size * 0.12, -h - L, 0); c.quadraticCurveTo(-h - L * 0.6, size * 0.12, -h - size * 0.14, size * 0.2); c.fill();
-      c.fillStyle = '#ffd35a'; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.12); c.quadraticCurveTo(-h - L * 0.4, -size * 0.06, -h - L * 0.65, 0); c.quadraticCurveTo(-h - L * 0.4, size * 0.06, -h - size * 0.14, size * 0.12); c.fill();
-      c.fillStyle = '#fffbe8'; c.beginPath(); c.ellipse(-h - size * 0.2, 0, L * 0.16, size * 0.05, 0, 0, 7); c.fill();
-    } else if (o.queued){
-      const pl = size * (0.1 + 0.04 * Math.sin(t * 0.03 + x));                     // дежурное пламя
-      c.fillStyle = '#7fd6ff'; c.globalAlpha *= 0.8; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.08); c.lineTo(-h - size * 0.14 - pl, 0); c.lineTo(-h - size * 0.14, size * 0.08); c.fill(); c.globalAlpha /= 0.8;
-    }
-    if (fl > 0 && o.flameFront){                                                   // обратная тяга носом
-      const L = size * 0.45 * fl;
-      c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(h + size * 0.05, -size * 0.12); c.lineTo(h + L, 0); c.lineTo(h + size * 0.05, size * 0.12); c.fill();
-    }
-    c.fillStyle = '#7d88a8'; c.strokeStyle = ink; c.lineWidth = lw * 0.8;          // сопло-колокол
-    c.beginPath(); c.moveTo(-h + 1, -size * 0.18); c.lineTo(-h - size * 0.15, -size * 0.25); c.lineTo(-h - size * 0.15, size * 0.25); c.lineTo(-h + 1, size * 0.18); c.closePath(); c.fill(); c.stroke();
+  if ((o.queued || o.flame) && !o.unrot) drawThruster(c, h, size, o, x, lw, true);
+  const spr = sprite(solar ? 'solar' : 'hull');
+  if (spr){                                                                         // спрайт скина: корпус всегда ровно (свет на картинке сверху-слева)
+    if (!o.unrot) c.rotate(-ang);
+    const k = size * 1.06; c.drawImage(spr, -k / 2, -k / 2, k, k);
+    if (o.glint > 0 && o.glint < 1){ c.save(); c.beginPath(); c.roundRect(-h, -h, size, size, size * 0.18); c.clip();
+      const gx = -h * 2 + o.glint * size * 2.2; c.fillStyle = 'rgba(255,248,220,0.7)';
+      c.beginPath(); c.moveTo(gx, -h); c.lineTo(gx + size * 0.22, -h); c.lineTo(gx - size * 0.3, h); c.lineTo(gx - size * 0.52, h); c.closePath(); c.fill(); c.restore(); }
+    if (o.lit && !solar) drawGlow(c, 0, 0, size * 0.34, css('--lamp'), 0.55 * o.lit);
+    if (!o.unrot) c.rotate(ang);
+  } else drawModuleBody(c, h, size, solar, lw, ink, o);
+  if (o.queued && !o.unrot) drawNose(c, h, size, lw);
+  if (o.tint){ c.strokeStyle = o.tint; c.lineWidth = Math.max(2.5, size * 0.1); c.beginPath(); c.roundRect(-h - 3, -h - 3, size + 6, size + 6, size * 0.26); c.stroke(); }
+  c.restore();
+}
+// Пламя, сопло и нос поверх 3D-модели: в 2D на верхнем слое, приподняты на полвысоты модели (камера смотрит под наклоном).
+function drawPieceExtras(c, x, y, size, ang, o, h){
+  const lw = Math.max(1.2, size * 0.07), lift = size * 0.3 * Math.cos(R3.PHI);
+  if (o.tint){ c.save(); c.translate(x, y - lift); c.rotate(o.unrot ? 0 : ang); c.strokeStyle = o.tint; c.lineWidth = Math.max(2.5, size * 0.1);   // обводка ошибки
+    c.beginPath(); c.roundRect(-h - 4, -size / 2 - 4, 2 * h + 8, size + 8, size * 0.28); c.stroke(); c.restore(); }
+  if (!((o.queued || o.flame) && !o.unrot)) return;
+  c.save(); c.translate(x, y - lift); c.rotate(ang); c.scale(o.sx || 1, o.sy || 1);
+  if (o.alpha !== undefined) c.globalAlpha *= o.alpha;
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  drawThruster(c, h + size * 0.12, size, o, x, lw, false);
+  if (o.queued) drawNose(c, h, size, lw);
+  c.restore();
+}
+// Пламя позади (−X — корма): разгон, дежурный огонёк в очереди, обратная тяга носом; bell — рисовать колокол сопла (в 3D он в модели).
+function drawThruster(c, h, size, o, x, lw, bell){
+  const fl = o.flame || 0, t = performance.now(), F = SK.flame;
+  if (fl > 0 && !o.flameFront){
+    const L = size * (0.3 + 0.75 * fl) * (0.85 + 0.15 * Math.sin(t * 0.06));
+    drawGlow(c, -h - size * 0.2, 0, size * 0.7 * fl, F[1], 0.8);
+    c.fillStyle = F[0]; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.2); c.quadraticCurveTo(-h - L * 0.6, -size * 0.12, -h - L, 0); c.quadraticCurveTo(-h - L * 0.6, size * 0.12, -h - size * 0.14, size * 0.2); c.fill();
+    c.fillStyle = F[1]; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.12); c.quadraticCurveTo(-h - L * 0.4, -size * 0.06, -h - L * 0.65, 0); c.quadraticCurveTo(-h - L * 0.4, size * 0.06, -h - size * 0.14, size * 0.12); c.fill();
+    c.fillStyle = F[2]; c.beginPath(); c.ellipse(-h - size * 0.2, 0, L * 0.16, size * 0.05, 0, 0, 7); c.fill();
+  } else if (o.queued){
+    const pl = size * (0.1 + 0.04 * Math.sin(t * 0.03 + x));                       // дежурное пламя
+    c.fillStyle = SK.idle; c.globalAlpha *= 0.8; c.beginPath(); c.moveTo(-h - size * 0.14, -size * 0.08); c.lineTo(-h - size * 0.14 - pl, 0); c.lineTo(-h - size * 0.14, size * 0.08); c.fill(); c.globalAlpha /= 0.8;
   }
+  if (fl > 0 && o.flameFront){                                                     // обратная тяга носом
+    const L = size * 0.45 * fl;
+    c.fillStyle = F[1]; c.beginPath(); c.moveTo(h + size * 0.05, -size * 0.12); c.lineTo(h + L, 0); c.lineTo(h + size * 0.05, size * 0.12); c.fill();
+  }
+  if (bell){ c.fillStyle = SK.nozzle; c.strokeStyle = SK.ink; c.lineWidth = lw * 0.8;                 // сопло-колокол
+    c.beginPath(); c.moveTo(-h + 1, -size * 0.18); c.lineTo(-h - size * 0.15, -size * 0.25); c.lineTo(-h - size * 0.15, size * 0.25); c.lineTo(-h + 1, size * 0.18); c.closePath(); c.fill(); c.stroke(); }
+}
+// Стрелка носа: куда полетит.
+function drawNose(c, h, size, lw){                                                   // шеврон не мельче 7 вирт. px — направление видно без пламени
+  const L = Math.max(7, size * 0.24), Wd = Math.max(6, size * 0.2);
+  c.fillStyle = SK.arrow; c.strokeStyle = SK.ink; c.lineWidth = Math.max(1.5, lw * 0.8);
+  c.beginPath(); c.moveTo(h + size * 0.05, -Wd); c.lineTo(h + size * 0.05 + L, 0); c.lineTo(h + size * 0.05, Wd); c.lineTo(h + size * 0.05 + L * 0.35, 0); c.closePath(); c.fill(); c.stroke();
+}
+// Корпус кодом (скин без спрайтов — «v0.3»): жилой — белый с иллюминатором, панель — синие ячейки в золотой раме.
+function drawModuleBody(c, h, size, solar, lw, ink, o){
   const r = size * 0.22;
   if (solar){
     c.fillStyle = css('--solar'); c.strokeStyle = '#7a5200'; c.lineWidth = lw;
@@ -1462,21 +1654,15 @@ function drawModule(c, x, y, size, kind, ang, o){
     c.fillStyle = 'rgba(255,255,255,0.85)'; c.beginPath(); c.arc(-wr * 0.28, wy - wr * 0.28, wr * 0.22, 0, 7); c.fill();
     c.strokeStyle = ink; c.lineWidth = lw; c.beginPath(); c.roundRect(-h, -h, size, size, r); c.stroke();
   }
-  if (o.queued && !o.unrot){                                                      // стрелка носа: куда полетит
-    c.fillStyle = '#e8eeff'; c.strokeStyle = ink; c.lineWidth = lw * 0.7;
-    c.beginPath(); c.moveTo(h + size * 0.08, -size * 0.13); c.lineTo(h + size * 0.24, 0); c.lineTo(h + size * 0.08, size * 0.13); c.closePath(); c.fill(); c.stroke();
-  }
-  if (o.tint){ c.strokeStyle = o.tint; c.lineWidth = Math.max(2.5, size * 0.1); c.beginPath(); c.roundRect(-h - 3, -h - 3, size + 6, size + 6, r * 1.2); c.stroke(); }
-  c.restore();
 }
 // Направляющая очереди: рейка от кромки поля наружу с захватом у переднего места и мигающим огоньком на конце.
 function drawRail(c, geo, ln, li, out, now, alive){
   const o = qOffsets(ln, 0), far = o.length ? o[o.length - 1].far : 1, a = slotAt(geo, ln, 0.15 + out), b = slotAt(geo, ln, Math.max(far, 1) + out);
   const t = geo.cell * 0.16;
   c.save(); c.globalAlpha = alive ? 1 : G.winAt ? Math.max(0, 0.2 - (now - G.winAt) / 1500) : 0.2;
-  c.strokeStyle = '#1a2150'; c.lineWidth = t + 3; c.lineCap = 'round';
+  c.strokeStyle = SK.rail[0]; c.lineWidth = t + 3; c.lineCap = 'round';
   c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
-  c.strokeStyle = '#3a4685'; c.lineWidth = t; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+  c.strokeStyle = SK.rail[1]; c.lineWidth = t; c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
   if (alive){ const on = 0.5 + 0.5 * Math.sin(now * 0.004 + li * 1.7); c.fillStyle = css('--ok'); c.globalAlpha = 0.4 + 0.6 * on; c.beginPath(); c.arc(b.x, b.y, geo.cell * 0.05, 0, 7); c.fill(); }
   c.restore();
 }
@@ -1486,7 +1672,7 @@ function drawQueues(c, geo, s, now){
   s.lanes.forEach((ln, li) => {
     const out = G.introAt ? (1 - easeOut((now - G.introAt - 200 - li * 45) / 420)) * 3 : 0;
     const alive = s.ptr[li] < ln.q.length;
-    drawRail(c, geo, ln, li, out, now, alive);
+    drawRail(D3 ? ctxb : c, geo, ln, li, out, now, alive);
     if (!alive) return;
     const busy = (G.laneBusy[li] || 0) > now, hideFront = busy && G.flights.some(f => f.li === li && f.res !== 'dock');
     const slideU = G.laneSlide[li] && s.ptr[li] > 0 ? easeOutBack((now - G.laneSlide[li]) / CFG.SLIDE_MS) : 1;
@@ -1593,7 +1779,7 @@ function drawFx(c, f, now, geo){
     const pop = easeOutBack(u / 0.18), y = f.y - geo.cell * 0.6 * easeOut(u), a = u > 0.6 ? 1 - (u - 0.6) / 0.4 : 1, fs = (f.big ? 26 : 20) * pop;
     c.save(); c.globalAlpha = a; c.font = '800 ' + fs.toFixed(1) + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
     const x = Math.max(60, Math.min(W - 60, f.x));
-    c.lineJoin = 'round'; c.lineWidth = 5; c.strokeStyle = '#0b1026'; c.strokeText(f.text, x, y); c.fillStyle = f.col; c.fillText(f.text, x, y); c.restore();
+    c.lineJoin = 'round'; c.lineWidth = 5; c.strokeStyle = SK.wordInk; c.strokeText(f.text, x, y); c.fillStyle = f.col; c.fillText(f.text, x, y); c.restore();
   } else if (f.type === 'edge'){
     const w = 60, a = 0.45 * (1 - u), side = f.side;                  // кромка, через которую модуль улетел (противоположная входу)
     const x0 = side === 'L' ? W - w : 0, y0 = side === 'T' ? H - w : 0, horiz = side === 'L' || side === 'R';
@@ -1659,10 +1845,15 @@ window.STYKOVKA = {
   speed(x){ setSpeed(x); return G.timeScale; },
   hint(){ G.lastInput = -1e9; return G.s ? solve(G.s)[0] : null; },
   reset(){ try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); },
+  skin(id){ if (id) setSkin(id); if (G.screen === 'menu') goto('menu'); return { skin: SK.id, r3: r3State }; },   // 'retro' | 'toy' | 'classic'
+  unlockAll(on){ setUnlockAll(on === undefined ? true : on); if (G.screen === 'menu') goto('menu'); return !!G.save.unlockAll; },
+  r3(){ return window.R3 && R3.ready ? Object.assign({ state: r3State }, R3.stats) : { state: r3State }; },
 };
 
 // --- старт ---
 fit(); hud();
+// ?skin=retro | ?skin=toy в адресе — своя ссылка на каждый скин (главнее сохранённого выбора)
+setSkin((() => { try { return new URLSearchParams(location.search).get('skin'); } catch (e) { return null; } })() || G.save.skin || 'retro');
 if (location.hash.length > 1) fromHash(); else goto('menu');
 requestAnimationFrame(frame);
 log('event', 'boot', 'v=' + VERSION + ' levels=' + LEVELS.length);
